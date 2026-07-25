@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Camera, Sparkles, MapPin, BookOpen, Clock, HeartHandshake, CheckCircle2, X, Radio, Upload, AlertCircle } from 'lucide-react';
+import { Search, Camera, Sparkles, MapPin, HeartHandshake, CheckCircle2, X, Radio, Upload, AlertCircle } from 'lucide-react';
 
 interface Book {
   id: string;
@@ -169,20 +169,31 @@ export default function Home() {
     };
     setUser(updatedUser);
     localStorage.setItem('glover_library_user', JSON.stringify(updatedUser));
-    setActiveModal(null);
+    
+    // Proceed to checkout if a book was selected during the scan flow
+    if (selectedBook) {
+      setActiveModal('checkout');
+    } else {
+      setActiveModal(null);
+    }
   };
 
-  // Simulate Physical Tag Scan in Aisle
+  // Trigger RFID Scanner
   const handleSimulateScan = (book: Book) => {
-    if (!user.isVerified) {
-      setActiveModal('verify');
-      return;
-    }
     setSelectedBook(book);
     setActiveModal('rfid-scanning');
     
+    // Simulate 1.5-second RFID tag hardware detection
     setTimeout(() => {
-      setActiveModal('checkout');
+      // Check verification after scanning tag
+      const savedUser = localStorage.getItem('glover_library_user');
+      const isVerified = user.isVerified || (savedUser && JSON.parse(savedUser).isVerified);
+
+      if (isVerified) {
+        setActiveModal('checkout');
+      } else {
+        setActiveModal('verify');
+      }
     }, 1500);
   };
 
@@ -192,7 +203,7 @@ export default function Home() {
     setActiveModal(null);
   };
 
-  // Multi-Tag Filter Matching Logic
+  // Filter Matching Logic
   const filteredBooks = books.filter(book => {
     const matchesSearch = book.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           book.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -251,29 +262,13 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Operational Highlights */}
+      {/* Operational Highlight */}
       <section className="bg-wharton-navy text-canvas py-8 px-6 md:px-16 my-6">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 text-center md:text-left">
-          <div className="flex items-start gap-4">
-            <HeartHandshake className="w-6 h-6 text-wharton-red shrink-0 mt-1" />
-            <div>
-              <h4 className="font-serif text-lg text-white">Borrow freely. Return thoughtfully.</h4>
-              <p className="text-xs text-canvas/70 mt-1">Every timely return ensures your classmates have access when they need it.</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-4">
-            <BookOpen className="w-6 h-6 text-wharton-red shrink-0 mt-1" />
-            <div>
-              <h4 className="font-serif text-lg text-white">Dewey Organized</h4>
-              <p className="text-xs text-canvas/70 mt-1">Arranged by theme for intuitive browsing on Floor 6.</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-4">
-            <Clock className="w-6 h-6 text-wharton-red shrink-0 mt-1" />
-            <div>
-              <h4 className="font-serif text-lg text-white">Automated Reminders</h4>
-              <p className="text-xs text-canvas/70 mt-1">Instant digital confirmations keep inventory moving seamlessly.</p>
-            </div>
+        <div className="max-w-3xl mx-auto text-center flex flex-col md:flex-row items-center justify-center gap-4">
+          <HeartHandshake className="w-8 h-8 text-wharton-red shrink-0" />
+          <div>
+            <h4 className="font-serif text-xl text-white">Borrow freely. Return thoughtfully.</h4>
+            <p className="text-xs text-canvas/70 mt-1">Every timely return ensures your classmates have access when they need it.</p>
           </div>
         </div>
       </section>
@@ -360,7 +355,18 @@ export default function Home() {
         </div>
       </section>
 
-      {/* MODAL 1: PennID Verification */}
+      {/* MODAL 1: RFID Tag Scanning Modal */}
+      {activeModal === 'rfid-scanning' && selectedBook && (
+        <div className="fixed inset-0 bg-wharton-navy/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-white border-2 border-wharton-navy max-w-sm w-full p-8 shadow-2xl text-center">
+            <Radio className="w-12 h-12 text-wharton-red mx-auto mb-4 animate-pulse" />
+            <h3 className="font-serif text-2xl text-wharton-navy mb-2">Scanning RFID Tag...</h3>
+            <p className="text-xs text-subtle">Hold device near the RFID tag on inside cover of <strong>"{selectedBook.title}"</strong>.</p>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: PennID Verification Modal */}
       {activeModal === 'verify' && (
         <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-canvas border border-wharton-navy max-w-md w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
@@ -459,7 +465,7 @@ export default function Home() {
               onClick={handleSaveVerification}
               className="w-full mt-6 bg-wharton-navy text-white py-3 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors"
             >
-              Save Verification & Store Card
+              Save Verification & Confirm Borrow
             </button>
 
             <div className="mt-4 pt-3 border-t border-wharton-navy/10 text-center">
@@ -475,7 +481,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL 2: Product Detail Page (PDP) */}
+      {/* MODAL 3: Product Detail Page (PDP) */}
       {activeModal === 'pdp' && selectedBook && (
         <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-canvas border border-wharton-navy max-w-lg w-full p-8 shadow-2xl relative">
@@ -520,17 +526,6 @@ export default function Home() {
                 </button>
               )}
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 3: Scanning Simulation */}
-      {activeModal === 'rfid-scanning' && selectedBook && (
-        <div className="fixed inset-0 bg-wharton-navy/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-white border-2 border-wharton-navy max-w-sm w-full p-8 shadow-2xl text-center">
-            <Radio className="w-12 h-12 text-wharton-red mx-auto mb-4 animate-pulse" />
-            <h3 className="font-serif text-2xl text-wharton-navy mb-2">Scanning Tag...</h3>
-            <p className="text-xs text-subtle">Hold device close to the inside cover tag of <strong>"{selectedBook.title}"</strong>.</p>
           </div>
         </div>
       )}
