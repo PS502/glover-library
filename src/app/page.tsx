@@ -1,16 +1,7 @@
-Here is the updated code replacing all occurrences of **`In Stock (Fl 6)`** and **`In Stock`** with **`Available`**!
-
----
-
-### Updated Code (`src/app/page.tsx`)
-
-Replace your **`src/app/page.tsx`** file on GitHub with this code:
-
-```tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Camera, Sparkles, MapPin, HeartHandshake, CheckCircle2, X, Radio, Upload, AlertCircle, RotateCcw, Gift, ShieldCheck, Lock, Download, RefreshCw } from 'lucide-react';
+import { Search, Camera, Sparkles, MapPin, HeartHandshake, CheckCircle2, X, Radio, Upload, AlertCircle, RotateCcw, Gift, ShieldCheck, Lock, Download, RefreshCw, Calendar } from 'lucide-react';
 
 interface Book {
   id: string;
@@ -23,6 +14,7 @@ interface Book {
   isWhartonFaculty?: boolean;
   isCheckedOut: boolean;
   checkedOutBy?: string;
+  dueDate?: string;
 }
 
 export default function Home() {
@@ -86,6 +78,13 @@ export default function Home() {
     'Finance',
     'Literature & Society'
   ];
+
+  // Helper to calculate 14-day due date
+  const getCalculatedDueDate = () => {
+    const date = new Date();
+    date.setDate(date.getDate() + 14);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
 
   // Complete Catalog of 91 Books
   const [books, setBooks] = useState<Book[]>([
@@ -201,7 +200,8 @@ export default function Home() {
         return {
           ...b,
           isCheckedOut: !b.isCheckedOut,
-          checkedOutBy: !b.isCheckedOut ? (user.name || 'Admin Override') : undefined
+          checkedOutBy: !b.isCheckedOut ? (user.name || 'Admin Override') : undefined,
+          dueDate: !b.isCheckedOut ? getCalculatedDueDate() : undefined
         };
       }
       return b;
@@ -210,9 +210,9 @@ export default function Home() {
 
   // Export Catalog as CSV File
   const handleExportCSV = () => {
-    const headers = ["ID,Title,Author,ISBN,Shelf,Status,CheckedOutBy\n"];
+    const headers = ["ID,Title,Author,ISBN,Shelf,Status,CheckedOutBy,DueDate\n"];
     const rows = books.map(b => 
-      `"${b.id}","${b.title.replace(/"/g, '""')}","${b.author.replace(/"/g, '""')}","${b.isbn || ''}","${b.shelf}","${b.isCheckedOut ? 'Checked Out' : 'Available'}","${b.checkedOutBy || ''}"`
+      `"${b.id}","${b.title.replace(/"/g, '""')}","${b.author.replace(/"/g, '""')}","${b.isbn || ''}","${b.shelf}","${b.isCheckedOut ? 'Checked Out' : 'Available'}","${b.checkedOutBy || ''}","${b.dueDate || ''}"`
     );
     const blob = new Blob([...headers, rows.join("\n")], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -297,12 +297,13 @@ export default function Home() {
   };
 
   const handleConfirmReturn = (bookId: string) => {
-    setBooks(prev => prev.map(b => b.id === bookId ? { ...b, isCheckedOut: false, checkedOutBy: undefined } : b));
+    setBooks(prev => prev.map(b => b.id === bookId ? { ...b, isCheckedOut: false, checkedOutBy: undefined, dueDate: undefined } : b));
     setActiveModal(null);
   };
 
   const handleCheckout = (bookId: string) => {
-    setBooks(prev => prev.map(b => b.id === bookId ? { ...b, isCheckedOut: true, checkedOutBy: user.name } : b));
+    const calculatedDue = getCalculatedDueDate();
+    setBooks(prev => prev.map(b => b.id === bookId ? { ...b, isCheckedOut: true, checkedOutBy: user.name || 'Gerald Glover', dueDate: calculatedDue } : b));
     setActiveModal(null);
   };
 
@@ -961,17 +962,21 @@ export default function Home() {
             </div>
             <h3 className="font-serif text-2xl text-wharton-navy mt-1 mb-4">{selectedBook.title}</h3>
 
-            <div className="bg-white p-4 border border-wharton-navy/10 space-y-2 text-xs mb-6">
+            <div className="bg-white p-4 border border-wharton-navy/10 space-y-2.5 text-xs mb-6">
               <div className="flex justify-between"><span className="text-subtle">Author:</span> <span className="font-medium">{selectedBook.author}</span></div>
               <div className="flex justify-between"><span className="text-subtle">Shelf Location:</span> <span className="font-medium text-wharton-red">{selectedBook.shelf}</span></div>
               <div className="flex justify-between"><span className="text-subtle">Patron:</span> <span className="font-medium">{user.name || 'Gerald Glover'} ({user.cohort})</span></div>
+              <div className="flex justify-between pt-2 border-t border-wharton-navy/10 font-semibold text-wharton-navy">
+                <span className="flex items-center gap-1 text-wharton-red"><Calendar className="w-3.5 h-3.5" /> Due Date (14 Days):</span> 
+                <span>{getCalculatedDueDate()}</span>
+              </div>
             </div>
 
             <button 
               onClick={() => handleCheckout(selectedBook.id)}
               className="w-full bg-wharton-navy text-white py-3 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center justify-center gap-2"
             >
-              <CheckCircle2 className="w-4 h-4" /> Confirm Honor Checkout
+              <CheckCircle2 className="w-4 h-4" /> CHECKOUT
             </button>
           </div>
         </div>
@@ -998,7 +1003,7 @@ export default function Home() {
               onClick={() => handleConfirmReturn(selectedBook.id)}
               className="w-full bg-emerald-700 text-white py-3 text-xs uppercase tracking-wider hover:bg-emerald-800 transition-colors flex items-center justify-center gap-2"
             >
-              <CheckCircle2 className="w-4 h-4" /> Confirm Return to Shelf
+              <CheckCircle2 className="w-4 h-4" /> RETURNED TO SHELF
             </button>
           </div>
         </div>
@@ -1012,5 +1017,3 @@ export default function Home() {
     </div>
   );
 }
-
-```
