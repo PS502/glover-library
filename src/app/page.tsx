@@ -7,7 +7,7 @@ interface Book {
   id: string;
   title: string;
   author: string;
-  tags: string[]; // Multiple tags per book
+  tags: string[];
   shelf: string;
   recommendedBy?: string;
   isWhartonFaculty?: boolean;
@@ -249,7 +249,7 @@ export default function Home() {
           A student-driven archive extending learning beyond the classroom.
         </h2>
         <p className="text-sm md:text-base text-charcoal/80 max-w-2xl mx-auto mb-8 leading-relaxed">
-          Founded and curated by <strong>Gerald Glover (WG’26)</strong>, Glover Library is a self-sustaining knowledge hub designed for Executive MBA participants. Software developed by <strong>Pooja S</strong>.
+          Founded and curated by <strong>Gerald Glover (WG’26)</strong>, Glover Library is a self-sustaining knowledge hub designed for Executive MBA participants.
         </p>
 
         {/* Smart Search Bar */}
@@ -561,7 +561,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border-wharton-navy/10 py-8 px-6 md:px-16 text-center text-xs text-subtle">
         <p>Glover Library • WEMBA Executive MBA Program • 2 Harrison St, San Francisco</p>
-        <p className="mt-1">Software developed by Pooja S • Curated by Gerald Glover (WG’26)</p>
+        <p className="mt-1 font-medium text-wharton-navy">App developed by Pooja S • Curated by Gerald Glover (WG’26)</p>
       </footer>
     </div>
   );
