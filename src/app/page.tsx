@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Camera, Sparkles, MapPin, HeartHandshake, CheckCircle2, X, Radio, Upload, AlertCircle, RotateCcw, Gift, ShieldCheck, Lock, Download, RefreshCw, Calendar } from 'lucide-react';
+import { Search, Camera, Sparkles, MapPin, HeartHandshake, CheckCircle2, X, Radio, Upload, AlertCircle, RotateCcw, Gift, ShieldCheck, Lock, Download, RefreshCw, Calendar, ShieldAlert } from 'lucide-react';
 
 interface Book {
   id: string;
@@ -49,7 +49,7 @@ export default function Home() {
 
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
   const [isScanningPhoto, setIsScanningPhoto] = useState(false);
-  const [activeModal, setActiveModal] = useState<'verify' | 'pdp' | 'rfid-scanning' | 'return-scanning' | 'checkout' | 'return-confirm' | 'donate' | 'admin-login' | 'admin-panel' | null>(null);
+  const [activeModal, setActiveModal] = useState<'verify' | 'pdp' | 'rfid-scanning' | 'return-scanning' | 'checkout' | 'return-confirm' | 'donate' | 'admin-login' | 'admin-panel' | 'verify-reminder' | null>(null);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTag, setFilterTag] = useState('All');
@@ -302,6 +302,12 @@ export default function Home() {
   };
 
   const handleCheckout = (bookId: string) => {
+    // Check verification state before completing borrow
+    if (!user.isVerified) {
+      setActiveModal('verify-reminder');
+      return;
+    }
+
     const calculatedDue = getCalculatedDueDate();
     setBooks(prev => prev.map(b => b.id === bookId ? { ...b, isCheckedOut: true, checkedOutBy: user.name || 'Gerald Glover', dueDate: calculatedDue } : b));
     setActiveModal(null);
@@ -876,9 +882,9 @@ export default function Home() {
 
             <button 
               onClick={handleSaveVerification}
-              className="w-full mt-6 bg-wharton-navy text-white py-3 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors"
+              className="w-full mt-6 bg-wharton-navy text-white py-3 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors font-semibold"
             >
-              Save Verification & Confirm Borrow
+              VERIFY
             </button>
 
             <div className="mt-4 pt-3 border-t border-wharton-navy/10 text-center">
@@ -894,7 +900,27 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL 7: Product Detail Page (PDP) */}
+      {/* MODAL 7: Verification Reminder Interstitial */}
+      {activeModal === 'verify-reminder' && (
+        <div className="fixed inset-0 bg-wharton-navy/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-canvas border-2 border-wharton-red max-w-sm w-full p-6 shadow-2xl relative text-center">
+            <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 text-wharton-navy/50 hover:text-wharton-navy"><X className="w-5 h-5" /></button>
+            <ShieldAlert className="w-12 h-12 text-wharton-red mx-auto mb-3" />
+            <h3 className="font-serif text-2xl text-wharton-navy mb-2">PennID Verification Required</h3>
+            <p className="text-xs text-subtle mb-6 leading-relaxed">
+              Please complete a quick one-time PennID verification before borrowing books from Glover Library.
+            </p>
+            <button 
+              onClick={() => setActiveModal('verify')}
+              className="w-full bg-wharton-navy text-white py-3 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center justify-center gap-2 font-semibold"
+            >
+              <Camera className="w-4 h-4" /> Proceed to PennID Verification
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 8: Product Detail Page (PDP) */}
       {activeModal === 'pdp' && selectedBook && (
         <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-canvas border border-wharton-navy max-w-lg w-full p-8 shadow-2xl relative">
@@ -951,7 +977,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL 8: Checkout Confirmation Modal */}
+      {/* MODAL 9: Checkout Confirmation Modal */}
       {activeModal === 'checkout' && selectedBook && (
         <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-canvas border border-wharton-navy max-w-md w-full p-6 shadow-2xl relative">
@@ -974,15 +1000,15 @@ export default function Home() {
 
             <button 
               onClick={() => handleCheckout(selectedBook.id)}
-              className="w-full bg-wharton-navy text-white py-3 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-wharton-navy text-white py-3 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center justify-center gap-2 font-semibold"
             >
-              <CheckCircle2 className="w-4 h-4" /> CHECKOUT
+              <CheckCircle2 className="w-4 h-4" /> BORROW
             </button>
           </div>
         </div>
       )}
 
-      {/* MODAL 9: Return Confirmation Modal */}
+      {/* MODAL 10: Return Confirmation Modal */}
       {activeModal === 'return-confirm' && selectedBook && (
         <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-canvas border border-wharton-navy max-w-md w-full p-6 shadow-2xl relative">
@@ -1001,7 +1027,7 @@ export default function Home() {
 
             <button 
               onClick={() => handleConfirmReturn(selectedBook.id)}
-              className="w-full bg-emerald-700 text-white py-3 text-xs uppercase tracking-wider hover:bg-emerald-800 transition-colors flex items-center justify-center gap-2"
+              className="w-full bg-emerald-700 text-white py-3 text-xs uppercase tracking-wider hover:bg-emerald-800 transition-colors flex items-center justify-center gap-2 font-semibold"
             >
               <CheckCircle2 className="w-4 h-4" /> RETURNED TO SHELF
             </button>
