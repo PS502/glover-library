@@ -1,23 +1,7 @@
-That combination hits the exact right note—it’s clean, punchy, and communicates mutual respect without sounding overly formal.
-
-Here is the updated code reflecting all of your refinements:
-
-1. **Updated Hero Subtitle:** *"Where community meets access — extending learning beyond the classroom."*
-2. **Updated Honor System Copy:** *"Borrow freely. Return thoughtfully. Every timely return ensures your classmates have access when they need it."*
-3. **Simplified Header:** Updated from *"6th Floor Physical Collection"* to **"Collection"**.
-4. **Uniform Tag Styling:** Removed the red background from *"Wharton Faculty"* so all tags share the exact same minimalist, editorial pill style.
-
----
-
-### Updated Code (`src/app/page.tsx`)
-
-Replace your **`src/app/page.tsx`** on GitHub with this code:
-
-```tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Camera, Bookmark, Sparkles, MapPin, BookOpen, Clock, HeartHandshake, CheckCircle2, X, CreditCard, Radio, Upload, AlertCircle } from 'lucide-react';
+import { Search, Camera, Sparkles, MapPin, BookOpen, Clock, HeartHandshake, CheckCircle2, X, Radio, Upload, AlertCircle } from 'lucide-react';
 
 interface Book {
   id: string;
@@ -60,7 +44,7 @@ export default function Home() {
 
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
   const [isScanningPhoto, setIsScanningPhoto] = useState(false);
-  const [activeModal, setActiveModal] = useState<'verify' | 'pass' | 'pdp' | 'rfid-scanning' | 'checkout' | null>(null);
+  const [activeModal, setActiveModal] = useState<'verify' | 'pdp' | 'rfid-scanning' | 'checkout' | null>(null);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTag, setFilterTag] = useState('All');
@@ -82,7 +66,7 @@ export default function Home() {
     'Literature & Society'
   ];
 
-  // Book Catalog with Multi-Tag Arrays
+  // Book Catalog
   const [books, setBooks] = useState<Book[]>([
     { 
       id: '1', 
@@ -140,54 +124,6 @@ export default function Home() {
       tags: ["Strategic Management", "Marketing", "Finance"], 
       shelf: "Dewey 658 - Pricing", 
       isCheckedOut: false 
-    },
-    { 
-      id: '7', 
-      title: "High Output Management", 
-      author: "Andrew S. Grove", 
-      tags: ["Operations", "Scaling", "Leadership & Culture"], 
-      shelf: "Dewey 658 - Operations", 
-      isCheckedOut: false 
-    },
-    { 
-      id: '8', 
-      title: "Zero to One", 
-      author: "Peter Thiel with Blake Masters", 
-      tags: ["Venture & Entrepreneurship", "Scaling", "Strategic Management"], 
-      shelf: "Dewey 658 - Startups", 
-      isCheckedOut: false 
-    },
-    { 
-      id: '9', 
-      title: "Billion Dollar Brand Club", 
-      author: "Lawrence Ingrassia", 
-      tags: ["Marketing", "Venture & Entrepreneurship", "Scaling"], 
-      shelf: "Dewey 658 - Branding", 
-      isCheckedOut: false 
-    },
-    { 
-      id: '10', 
-      title: "Genius Makers", 
-      author: "Cade Metz", 
-      tags: ["AI for Business", "Literature & Society"], 
-      shelf: "Dewey 006 - AI History", 
-      isCheckedOut: false 
-    },
-    { 
-      id: '11', 
-      title: "The Fund", 
-      author: "Rob Copeland", 
-      tags: ["Finance", "Macroeconomics"], 
-      shelf: "Dewey 332 - Hedge Funds", 
-      isCheckedOut: false 
-    },
-    { 
-      id: '12', 
-      title: "Pachinko", 
-      author: "Min Jin Lee", 
-      tags: ["Literature & Society"], 
-      shelf: "Dewey 813 - Fiction", 
-      isCheckedOut: false 
     }
   ]);
 
@@ -236,8 +172,8 @@ export default function Home() {
     setActiveModal(null);
   };
 
-  // Simulate Physical RFID Tag Scan in Aisle
-  const handleSimulateRFIDScan = (book: Book) => {
+  // Simulate Physical Tag Scan in Aisle
+  const handleSimulateScan = (book: Book) => {
     if (!user.isVerified) {
       setActiveModal('verify');
       return;
@@ -286,12 +222,6 @@ export default function Home() {
             className={`flex items-center gap-2 border px-4 py-2.5 text-xs tracking-wider uppercase transition-colors ${user.isVerified ? 'border-emerald-700 text-emerald-800 bg-emerald-50' : 'border-wharton-navy/20 text-wharton-navy hover:bg-wharton-navy hover:text-white'}`}
           >
             <Camera className="w-4 h-4 text-wharton-red" /> {user.isVerified ? '✓ PennID Verified' : 'PennID Verify'}
-          </button>
-          <button 
-            onClick={() => setActiveModal('pass')}
-            className="bg-wharton-navy text-canvas px-4 py-2.5 text-xs tracking-wider uppercase hover:bg-wharton-red transition-colors flex items-center gap-2"
-          >
-            <CreditCard className="w-4 h-4" /> Digital Pass
           </button>
         </div>
       </header>
@@ -418,10 +348,10 @@ export default function Home() {
                 </div>
                 {!book.isCheckedOut && (
                   <button 
-                    onClick={() => handleSimulateRFIDScan(book)}
+                    onClick={() => handleSimulateScan(book)}
                     className="bg-wharton-navy text-white px-3 py-1.5 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center gap-1.5"
                   >
-                    <Radio className="w-3.5 h-3.5" /> Scan RFID
+                    <Radio className="w-3.5 h-3.5" /> Scan
                   </button>
                 )}
               </div>
@@ -583,10 +513,10 @@ export default function Home() {
               </div>
               {!selectedBook.isCheckedOut && (
                 <button 
-                  onClick={() => handleSimulateRFIDScan(selectedBook)}
+                  onClick={() => handleSimulateScan(selectedBook)}
                   className="bg-wharton-navy text-white px-4 py-2 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center gap-2"
                 >
-                  <Radio className="w-4 h-4" /> Scan RFID Tag to Borrow
+                  <Radio className="w-4 h-4" /> Scan Tag to Borrow
                 </button>
               )}
             </div>
@@ -594,25 +524,25 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL 3: RFID Scanning Simulation */}
+      {/* MODAL 3: Scanning Simulation */}
       {activeModal === 'rfid-scanning' && selectedBook && (
         <div className="fixed inset-0 bg-wharton-navy/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-white border-2 border-wharton-navy max-w-sm w-full p-8 shadow-2xl text-center">
             <Radio className="w-12 h-12 text-wharton-red mx-auto mb-4 animate-pulse" />
-            <h3 className="font-serif text-2xl text-wharton-navy mb-2">Reading RFID Tag...</h3>
+            <h3 className="font-serif text-2xl text-wharton-navy mb-2">Scanning Tag...</h3>
             <p className="text-xs text-subtle">Hold device close to the inside cover tag of <strong>"{selectedBook.title}"</strong>.</p>
           </div>
         </div>
       )}
 
-      {/* MODAL 4: RFID Book Recognized -> Checkout Option */}
+      {/* MODAL 4: Book Recognized -> Checkout Option */}
       {activeModal === 'checkout' && selectedBook && (
         <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-canvas border border-wharton-navy max-w-md w-full p-6 shadow-2xl relative">
             <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 text-wharton-navy/50 hover:text-wharton-navy"><X className="w-5 h-5" /></button>
             
             <div className="flex items-center gap-2 text-emerald-700 text-xs uppercase tracking-widest font-semibold mb-1">
-              <CheckCircle2 className="w-4 h-4" /> RFID Tag Recognized
+              <CheckCircle2 className="w-4 h-4" /> Tag Recognized
             </div>
             <h3 className="font-serif text-2xl text-wharton-navy mt-1 mb-4">{selectedBook.title}</h3>
 
@@ -632,39 +562,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL 5: Digital Pass */}
-      {activeModal === 'pass' && (
-        <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white border-2 border-wharton-navy max-w-sm w-full p-6 shadow-2xl relative">
-            <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 text-wharton-navy/50 hover:text-wharton-navy"><X className="w-5 h-5" /></button>
-            <div className="text-center border-b border-wharton-navy/10 pb-4 mb-4">
-              <span className="text-[10px] uppercase tracking-widest text-wharton-red font-bold">Wharton Executive MBA</span>
-              <h3 className="font-serif text-2xl text-wharton-navy">Glover Library Pass</h3>
-              <p className="text-xs text-subtle mt-1">2 Harrison St • 6th Floor</p>
-            </div>
-
-            <div className="space-y-2 text-center my-6">
-              <p className="font-serif text-xl text-wharton-navy">{user.name || 'Patron'}</p>
-              <p className="text-xs text-subtle">PennID: {user.pennId || 'Pending'} • {user.cohort}</p>
-            </div>
-
-            <div className="bg-canvas p-4 text-center border border-wharton-navy/10">
-              <div className="h-12 bg-charcoal/80 w-full mb-2 flex items-center justify-center text-white text-[10px] tracking-widest font-mono">
-                ||| | |||| || ||| |||| | |||
-              </div>
-              <span className="text-[10px] text-subtle font-mono">{user.pennId || '84920134'}-WEMBA-2026</span>
-            </div>
-
-            <button 
-              onClick={() => setActiveModal(null)}
-              className="w-full mt-6 border border-wharton-navy text-wharton-navy py-2 text-xs uppercase tracking-wider hover:bg-wharton-navy hover:text-white transition-colors"
-            >
-              Close Pass
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Footer */}
       <footer className="border-t border-wharton-navy/10 py-8 px-6 md:px-16 text-center text-xs text-subtle">
         <p>Glover Library • WEMBA Executive MBA Program • 2 Harrison St, San Francisco</p>
@@ -673,5 +570,3 @@ export default function Home() {
     </div>
   );
 }
-
-```
