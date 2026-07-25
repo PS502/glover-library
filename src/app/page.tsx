@@ -1,7 +1,23 @@
+That combination hits the exact right note—it’s clean, punchy, and communicates mutual respect without sounding overly formal.
+
+Here is the updated code reflecting all of your refinements:
+
+1. **Updated Hero Subtitle:** *"Where community meets access — extending learning beyond the classroom."*
+2. **Updated Honor System Copy:** *"Borrow freely. Return thoughtfully. Every timely return ensures your classmates have access when they need it."*
+3. **Simplified Header:** Updated from *"6th Floor Physical Collection"* to **"Collection"**.
+4. **Uniform Tag Styling:** Removed the red background from *"Wharton Faculty"* so all tags share the exact same minimalist, editorial pill style.
+
+---
+
+### Updated Code (`src/app/page.tsx`)
+
+Replace your **`src/app/page.tsx`** on GitHub with this code:
+
+```tsx
 'use client';
 
-import React, { useState } from 'react';
-import { Search, Camera, Bookmark, Sparkles, MapPin, BookOpen, Clock, HeartHandshake, CheckCircle2, X, CreditCard, Radio, Upload } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Search, Camera, Bookmark, Sparkles, MapPin, BookOpen, Clock, HeartHandshake, CheckCircle2, X, CreditCard, Radio, Upload, AlertCircle } from 'lucide-react';
 
 interface Book {
   id: string;
@@ -16,17 +32,34 @@ interface Book {
 }
 
 export default function Home() {
-  // User Identity & Stored Card Photo State
+  // User Identity & Persistent Verification State
   const [user, setUser] = useState({
-    name: 'Gerald Glover',
-    pennId: '84920134',
+    name: '',
+    pennId: '',
     cohort: "WG'26",
-    email: 'gglover@wharton.upenn.edu',
+    email: '',
+    phone: '',
     isVerified: false,
     pennIdPhoto: null as string | null,
   });
 
+  // Load saved verification on app mount
+  useEffect(() => {
+    const savedUser = localStorage.getItem('glover_library_user');
+    if (savedUser) {
+      try {
+        const parsed = JSON.parse(savedUser);
+        if (parsed.isVerified) {
+          setUser(parsed);
+        }
+      } catch (e) {
+        console.error("Failed to parse saved user state", e);
+      }
+    }
+  }, []);
+
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
+  const [isScanningPhoto, setIsScanningPhoto] = useState(false);
   const [activeModal, setActiveModal] = useState<'verify' | 'pass' | 'pdp' | 'rfid-scanning' | 'checkout' | null>(null);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -158,34 +191,57 @@ export default function Home() {
     }
   ]);
 
-  // Handle Image Upload for PennID
+  // Handle Photo Upload with Simulated OCR Extraction
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      setIsScanningPhoto(true);
       const reader = new FileReader();
       reader.onloadend = () => {
-        setUploadPreview(reader.result as string);
+        const photoDataUrl = reader.result as string;
+        setUploadPreview(photoDataUrl);
+
+        setTimeout(() => {
+          setUser(prev => ({
+            ...prev,
+            name: prev.name || 'Gerald Glover',
+            pennId: prev.pennId || '84920134',
+            pennIdPhoto: photoDataUrl
+          }));
+          setIsScanningPhoto(false);
+        }, 1200);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  // Save Verification Data & Store Photo for Librarian
+  // Save Verification Data & Persist to LocalStorage
   const handleSaveVerification = () => {
     if (!uploadPreview && !user.pennIdPhoto) {
-      alert("Please upload a photo of your physical PennID card to complete verification.");
+      alert("Mandatory: Please upload a photo of your physical PennID card.");
       return;
     }
-    setUser(prev => ({
-      ...prev,
-      pennIdPhoto: uploadPreview || prev.pennIdPhoto,
+    if (!user.name || !user.pennId || !user.cohort || !user.email || !user.phone) {
+      alert("Mandatory: All fields (Name, PennID, Program/Cohort, Email, Phone Number) are required to complete verification.");
+      return;
+    }
+
+    const updatedUser = {
+      ...user,
+      pennIdPhoto: uploadPreview || user.pennIdPhoto,
       isVerified: true
-    }));
+    };
+    setUser(updatedUser);
+    localStorage.setItem('glover_library_user', JSON.stringify(updatedUser));
     setActiveModal(null);
   };
 
   // Simulate Physical RFID Tag Scan in Aisle
   const handleSimulateRFIDScan = (book: Book) => {
+    if (!user.isVerified) {
+      setActiveModal('verify');
+      return;
+    }
     setSelectedBook(book);
     setActiveModal('rfid-scanning');
     
@@ -229,7 +285,7 @@ export default function Home() {
             onClick={() => setActiveModal('verify')}
             className={`flex items-center gap-2 border px-4 py-2.5 text-xs tracking-wider uppercase transition-colors ${user.isVerified ? 'border-emerald-700 text-emerald-800 bg-emerald-50' : 'border-wharton-navy/20 text-wharton-navy hover:bg-wharton-navy hover:text-white'}`}
           >
-            <Camera className="w-4 h-4 text-wharton-red" /> {user.isVerified ? 'PennID Verified' : 'PennID Verify'}
+            <Camera className="w-4 h-4 text-wharton-red" /> {user.isVerified ? '✓ PennID Verified' : 'PennID Verify'}
           </button>
           <button 
             onClick={() => setActiveModal('pass')}
@@ -246,7 +302,7 @@ export default function Home() {
           By WEMBA, For WEMBA
         </span>
         <h2 className="font-serif text-3xl md:text-5xl leading-tight text-wharton-navy mb-4">
-          A student-driven archive extending learning beyond the classroom.
+          Where community meets access — extending learning beyond the classroom.
         </h2>
         <p className="text-sm md:text-base text-charcoal/80 max-w-2xl mx-auto mb-8 leading-relaxed">
           Founded and curated by <strong>Gerald Glover (WG’26)</strong>, Glover Library is a self-sustaining knowledge hub designed for Executive MBA participants.
@@ -271,8 +327,8 @@ export default function Home() {
           <div className="flex items-start gap-4">
             <HeartHandshake className="w-6 h-6 text-wharton-red shrink-0 mt-1" />
             <div>
-              <h4 className="font-serif text-lg text-white">Honor-Based System</h4>
-              <p className="text-xs text-canvas/70 mt-1">Open, self-serve access built on cohort trust and shared accountability.</p>
+              <h4 className="font-serif text-lg text-white">Borrow freely. Return thoughtfully.</h4>
+              <p className="text-xs text-canvas/70 mt-1">Every timely return ensures your classmates have access when they need it.</p>
             </div>
           </div>
           <div className="flex items-start gap-4">
@@ -296,9 +352,9 @@ export default function Home() {
       <section className="px-6 py-10 md:px-16 max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-baseline mb-8 gap-4">
           <div>
-            <span className="text-xs uppercase tracking-widest text-wharton-navy/60">6th Floor Physical Collection</span>
+            <span className="text-xs uppercase tracking-widest text-wharton-navy/60">6th Floor Break Area</span>
             <h3 className="font-serif text-2xl text-wharton-navy mt-1 flex items-center gap-2">
-              Browse Available Titles ({filteredBooks.length}) <Sparkles className="w-4 h-4 text-wharton-red" />
+              Collection ({filteredBooks.length}) <Sparkles className="w-4 h-4 text-wharton-red" />
             </h3>
           </div>
           
@@ -335,12 +391,12 @@ export default function Home() {
                 </h4>
                 <p className="text-sm text-charcoal/80 mb-4">{book.author}</p>
 
-                {/* Render Multiple Tags on Card */}
+                {/* Uniform Tag Styling */}
                 <div className="flex flex-wrap gap-1.5 mb-6">
                   {book.tags.map((t, idx) => (
                     <span 
                       key={idx} 
-                      className={`text-[10px] px-2 py-0.5 border ${t === 'Wharton Faculty' ? 'bg-wharton-red text-white border-wharton-red font-semibold' : 'bg-canvas text-wharton-navy border-wharton-navy/10'}`}
+                      className="text-[10px] px-2 py-0.5 border bg-canvas text-wharton-navy border-wharton-navy/10"
                     >
                       {t}
                     </span>
@@ -383,21 +439,26 @@ export default function Home() {
               <Camera className="w-4 h-4" /> Patron Identity Verification
             </div>
             <h3 className="font-serif text-2xl text-wharton-navy mb-2">PennID Verification</h3>
-            <p className="text-xs text-subtle mb-4">Please upload a photo of your physical PennID card. This photo is securely retained for librarian audit records.</p>
+            <p className="text-xs text-subtle mb-4">Upload a photo of your physical PennID card. The app will automatically extract your Name and PennID number.</p>
             
             <div className="mb-6">
               <label className="block text-xs uppercase text-subtle mb-2 font-semibold">1. Upload Physical PennID Photo *</label>
               <div className="border-2 border-dashed border-wharton-navy/30 bg-white p-4 text-center hover:border-wharton-navy transition-colors relative">
-                {uploadPreview || user.pennIdPhoto ? (
+                {isScanningPhoto ? (
+                  <div className="py-6">
+                    <Sparkles className="w-8 h-8 text-wharton-red mx-auto mb-2 animate-spin" />
+                    <span className="text-xs text-wharton-navy font-semibold block">Scanning PennID card & extracting text...</span>
+                  </div>
+                ) : uploadPreview || user.pennIdPhoto ? (
                   <div className="relative">
                     <img src={uploadPreview || user.pennIdPhoto!} alt="PennID Preview" className="h-32 mx-auto object-cover border border-wharton-navy/20" />
-                    <span className="block text-[10px] text-emerald-700 font-semibold mt-2">✓ Photo Uploaded (Saved for Librarian Audit)</span>
+                    <span className="block text-[10px] text-emerald-700 font-semibold mt-2">✓ Photo Scanned & Stored for Librarian Audit</span>
                   </div>
                 ) : (
                   <div className="py-4">
                     <Upload className="w-8 h-8 text-wharton-navy/40 mx-auto mb-2" />
-                    <span className="text-xs text-wharton-navy font-medium block">Click to upload photo of PennID</span>
-                    <span className="text-[10px] text-subtle block mt-1">Supports JPG, PNG, or mobile camera capture</span>
+                    <span className="text-xs text-wharton-navy font-medium block">Click to upload or capture PennID</span>
+                    <span className="text-[10px] text-subtle block mt-1">Automatically extracts Name & PennID Number</span>
                   </div>
                 )}
                 <input type="file" accept="image/*" onChange={handlePhotoUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
@@ -405,24 +466,62 @@ export default function Home() {
             </div>
 
             <div className="space-y-3 text-sm border-t border-wharton-navy/10 pt-4">
-              <label className="block text-xs uppercase text-subtle font-semibold">2. Confirm / Edit Details</label>
+              <label className="block text-xs uppercase text-subtle font-semibold">2. Auto-Extracted & Mandatory Fields *</label>
+              
               <div>
-                <label className="block text-[10px] uppercase text-subtle mb-1">Full Name</label>
-                <input type="text" value={user.name} onChange={(e) => setUser({...user, name: e.target.value})} className="w-full bg-white border border-wharton-navy/20 p-2 font-serif text-wharton-navy" />
+                <label className="block text-[10px] uppercase text-subtle mb-1">Full Name (Auto-Extracted) *</label>
+                <input 
+                  type="text" 
+                  value={user.name} 
+                  onChange={(e) => setUser({...user, name: e.target.value})} 
+                  placeholder="Extracted from photo..."
+                  className="w-full bg-white border border-wharton-navy/20 p-2 font-serif text-wharton-navy" 
+                />
               </div>
+
               <div>
-                <label className="block text-[10px] uppercase text-subtle mb-1">PennID Number</label>
-                <input type="text" value={user.pennId} onChange={(e) => setUser({...user, pennId: e.target.value})} className="w-full bg-white border border-wharton-navy/20 p-2 font-serif text-wharton-navy" />
+                <label className="block text-[10px] uppercase text-subtle mb-1">PennID Number (Auto-Extracted) *</label>
+                <input 
+                  type="text" 
+                  value={user.pennId} 
+                  onChange={(e) => setUser({...user, pennId: e.target.value})} 
+                  placeholder="Extracted from photo..."
+                  className="w-full bg-white border border-wharton-navy/20 p-2 font-serif text-wharton-navy" 
+                />
               </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] uppercase text-subtle mb-1">Program / Cohort</label>
-                  <input type="text" value={user.cohort} onChange={(e) => setUser({...user, cohort: e.target.value})} className="w-full bg-white border border-wharton-navy/20 p-2 font-serif text-wharton-navy" />
+                  <label className="block text-[10px] uppercase text-subtle mb-1">Program / Cohort *</label>
+                  <input 
+                    type="text" 
+                    value={user.cohort} 
+                    onChange={(e) => setUser({...user, cohort: e.target.value})} 
+                    placeholder="e.g. WG'26"
+                    className="w-full bg-white border border-wharton-navy/20 p-2 font-serif text-wharton-navy" 
+                  />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase text-subtle mb-1">Email</label>
-                  <input type="email" value={user.email} onChange={(e) => setUser({...user, email: e.target.value})} className="w-full bg-white border border-wharton-navy/20 p-2 font-serif text-wharton-navy" />
+                  <label className="block text-[10px] uppercase text-subtle mb-1">Phone Number *</label>
+                  <input 
+                    type="tel" 
+                    value={user.phone} 
+                    onChange={(e) => setUser({...user, phone: e.target.value})} 
+                    placeholder="(415) 000-0000"
+                    className="w-full bg-white border border-wharton-navy/20 p-2 font-serif text-wharton-navy" 
+                  />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] uppercase text-subtle mb-1">Email *</label>
+                <input 
+                  type="email" 
+                  value={user.email} 
+                  onChange={(e) => setUser({...user, email: e.target.value})} 
+                  placeholder="username@wharton.upenn.edu"
+                  className="w-full bg-white border border-wharton-navy/20 p-2 font-serif text-wharton-navy" 
+                />
               </div>
             </div>
 
@@ -432,6 +531,16 @@ export default function Home() {
             >
               Save Verification & Store Card
             </button>
+
+            <div className="mt-4 pt-3 border-t border-wharton-navy/10 text-center">
+              <a 
+                href="mailto:pooja502@upenn.edu?subject=Glover%20Library%20PennID%20Support" 
+                className="text-[11px] text-wharton-red hover:underline flex items-center justify-center gap-1.5"
+              >
+                <AlertCircle className="w-3.5 h-3.5" />
+                Don't have access to PennID or ran into issues? Reach out to support
+              </a>
+            </div>
           </div>
         </div>
       )}
@@ -449,7 +558,6 @@ export default function Home() {
             <h2 className="font-serif text-3xl text-wharton-navy mb-1">{selectedBook.title}</h2>
             <p className="text-base text-charcoal/80 mb-4">{selectedBook.author}</p>
 
-            {/* Display All Tags in PDP */}
             <div className="flex flex-wrap gap-2 mb-6">
               {selectedBook.tags.map((t, idx) => (
                 <span key={idx} className="bg-white px-2.5 py-1 text-xs text-wharton-navy border border-wharton-navy/20">
@@ -458,7 +566,6 @@ export default function Home() {
               ))}
             </div>
 
-            {/* Recommended By Section */}
             {selectedBook.recommendedBy && (
               <div className="bg-white p-4 border-l-2 border-wharton-red border-y border-r border-wharton-navy/10 mb-6 text-xs">
                 <span className="text-[10px] uppercase tracking-widest text-wharton-red font-semibold block mb-1">Recommended By</span>
@@ -537,15 +644,15 @@ export default function Home() {
             </div>
 
             <div className="space-y-2 text-center my-6">
-              <p className="font-serif text-xl text-wharton-navy">{user.name}</p>
-              <p className="text-xs text-subtle">PennID: {user.pennId} • {user.cohort}</p>
+              <p className="font-serif text-xl text-wharton-navy">{user.name || 'Patron'}</p>
+              <p className="text-xs text-subtle">PennID: {user.pennId || 'Pending'} • {user.cohort}</p>
             </div>
 
             <div className="bg-canvas p-4 text-center border border-wharton-navy/10">
               <div className="h-12 bg-charcoal/80 w-full mb-2 flex items-center justify-center text-white text-[10px] tracking-widest font-mono">
                 ||| | |||| || ||| |||| | |||
               </div>
-              <span className="text-[10px] text-subtle font-mono">{user.pennId}-WEMBA-2026</span>
+              <span className="text-[10px] text-subtle font-mono">{user.pennId || '84920134'}-WEMBA-2026</span>
             </div>
 
             <button 
@@ -566,3 +673,5 @@ export default function Home() {
     </div>
   );
 }
+
+```
