@@ -1,20 +1,4 @@
-Here is the updated code incorporating **Option A: Integrated Admin Mode**!
-
-Librarians can now unlock a dedicated management dashboard right inside the app using the passcode **`Bound2BeAGoodBook`**.
-
----
-
-### Key Admin Features Added
-
-1. **Admin Portal Button:** A subtle **`Admin`** lock icon in the header navigation.
-2. **Passcode Protection Modal:** Prompts for the passcode **`Bound2BeAGoodBook`** before granting access.
-3. **Comprehensive Management Dashboard (`/admin` mode):**
-* **Real-time Inventory Overview:** Filter by stock status (`All`, `In Stock`, `Checked Out`).
-* **Manual Overrides:** Instantly toggle book availability or force check-in/checkout without scanning.
-* **CSV Export:** One-click button to download the entire library collection as a `.csv` file for backup/spreadsheet tracking.
-* **Patron Verification Ledger:** Displays verified patron records with extracted PennID numbers and emails.
-
-
+Here is the updated code replacing all occurrences of **`In Stock (Fl 6)`** and **`In Stock`** with **`Available`**!
 
 ---
 
@@ -228,7 +212,7 @@ export default function Home() {
   const handleExportCSV = () => {
     const headers = ["ID,Title,Author,ISBN,Shelf,Status,CheckedOutBy\n"];
     const rows = books.map(b => 
-      `"${b.id}","${b.title.replace(/"/g, '""')}","${b.author.replace(/"/g, '""')}","${b.isbn || ''}","${b.shelf}","${b.isCheckedOut ? 'Checked Out' : 'In Stock'}","${b.checkedOutBy || ''}"`
+      `"${b.id}","${b.title.replace(/"/g, '""')}","${b.author.replace(/"/g, '""')}","${b.isbn || ''}","${b.shelf}","${b.isCheckedOut ? 'Checked Out' : 'Available'}","${b.checkedOutBy || ''}"`
     );
     const blob = new Blob([...headers, rows.join("\n")], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -504,7 +488,7 @@ export default function Home() {
                     </span>
                   ) : (
                     <span className="text-emerald-700 font-medium flex items-center gap-1">
-                      ● In Stock (Fl 6)
+                      ● Available
                     </span>
                   )}
                 </div>
@@ -605,7 +589,7 @@ export default function Home() {
                   onClick={() => setAdminStockFilter('in-stock')}
                   className={`px-3 py-1 border ${adminStockFilter === 'in-stock' ? 'bg-emerald-800 text-white' : 'bg-white'}`}
                 >
-                  In Stock ({books.filter(b => !b.isCheckedOut).length})
+                  Available ({books.filter(b => !b.isCheckedOut).length})
                 </button>
                 <button 
                   onClick={() => setAdminStockFilter('checked-out')}
@@ -640,7 +624,7 @@ export default function Home() {
                         {b.isCheckedOut ? (
                           <span className="text-wharton-red font-semibold">● Checked Out</span>
                         ) : (
-                          <span className="text-emerald-700 font-semibold">● In Stock</span>
+                          <span className="text-emerald-700 font-semibold">● Available</span>
                         )}
                       </td>
                       <td className="p-3 font-medium text-charcoal/80">
@@ -943,7 +927,7 @@ export default function Home() {
                 {selectedBook.isCheckedOut ? (
                   <span className="text-wharton-red font-medium">Checked out by {selectedBook.checkedOutBy}</span>
                 ) : (
-                  <span className="text-emerald-700 font-medium">● Available at 2 Harrison St (Fl 6)</span>
+                  <span className="text-emerald-700 font-medium">● Available</span>
                 )}
               </div>
               {selectedBook.isCheckedOut ? (
