@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Camera, Sparkles, MapPin, HeartHandshake, CheckCircle2, X, Radio, Upload, AlertCircle } from 'lucide-react';
+import { Search, Camera, Sparkles, MapPin, HeartHandshake, CheckCircle2, X, Radio, Upload, AlertCircle, RotateCcw, PlusCircle, Gift } from 'lucide-react';
 
 interface Book {
   id: string;
@@ -44,10 +44,19 @@ export default function Home() {
 
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
   const [isScanningPhoto, setIsScanningPhoto] = useState(false);
-  const [activeModal, setActiveModal] = useState<'verify' | 'pdp' | 'rfid-scanning' | 'checkout' | null>(null);
+  const [activeModal, setActiveModal] = useState<'verify' | 'pdp' | 'rfid-scanning' | 'return-scanning' | 'checkout' | 'return-confirm' | 'donate' | null>(null);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTag, setFilterTag] = useState('All');
+
+  // Donation Form State
+  const [donationForm, setDonationForm] = useState({
+    title: '',
+    author: '',
+    tag: 'Strategic Management',
+    donorName: '',
+    donorCohort: "WG'26"
+  });
 
   // Finalized Wharton Genre & Feature Filter Options
   const whartonTags = [
@@ -76,7 +85,8 @@ export default function Home() {
       shelf: "Dewey 325 - Migration", 
       isWhartonFaculty: true, 
       recommendedBy: "Prof. Zeke Hernandez", 
-      isCheckedOut: false 
+      isCheckedOut: true,
+      checkedOutBy: "Gerald Glover"
     },
     { 
       id: '2', 
@@ -170,7 +180,6 @@ export default function Home() {
     setUser(updatedUser);
     localStorage.setItem('glover_library_user', JSON.stringify(updatedUser));
     
-    // Proceed to checkout if a book was selected during the scan flow
     if (selectedBook) {
       setActiveModal('checkout');
     } else {
@@ -178,14 +187,12 @@ export default function Home() {
     }
   };
 
-  // Trigger RFID Scanner
+  // Trigger RFID Checkout Scanner
   const handleSimulateScan = (book: Book) => {
     setSelectedBook(book);
     setActiveModal('rfid-scanning');
     
-    // Simulate 1.5-second RFID tag hardware detection
     setTimeout(() => {
-      // Check verification after scanning tag
       const savedUser = localStorage.getItem('glover_library_user');
       const isVerified = user.isVerified || (savedUser && JSON.parse(savedUser).isVerified);
 
@@ -197,10 +204,51 @@ export default function Home() {
     }, 1500);
   };
 
+  // Trigger RFID Return Scanner
+  const handleSimulateReturnScan = (book?: Book) => {
+    const targetBook = book || books.find(b => b.isCheckedOut) || books[0];
+    setSelectedBook(targetBook);
+    setActiveModal('return-scanning');
+    
+    setTimeout(() => {
+      setActiveModal('return-confirm');
+    }, 1500);
+  };
+
+  // Confirm Final Return
+  const handleConfirmReturn = (bookId: string) => {
+    setBooks(prev => prev.map(b => b.id === bookId ? { ...b, isCheckedOut: false, checkedOutBy: undefined } : b));
+    setActiveModal(null);
+  };
+
   // Handle Final Book Checkout
   const handleCheckout = (bookId: string) => {
     setBooks(prev => prev.map(b => b.id === bookId ? { ...b, isCheckedOut: true, checkedOutBy: user.name } : b));
     setActiveModal(null);
+  };
+
+  // Submit Book Donation
+  const handleDonateBookSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!donationForm.title || !donationForm.author || !donationForm.donorName) {
+      alert("Please fill in the book title, author, and donor name.");
+      return;
+    }
+
+    const newBook: Book = {
+      id: Date.now().toString(),
+      title: donationForm.title,
+      author: donationForm.author,
+      tags: [donationForm.tag],
+      shelf: "Dewey 658 - General Executive",
+      recommendedBy: `Donated by ${donationForm.donorName} (${donationForm.donorCohort})`,
+      isCheckedOut: false
+    };
+
+    setBooks(prev => [newBook, ...prev]);
+    setDonationForm({ title: '', author: '', tag: 'Strategic Management', donorName: '', donorCohort: "WG'26" });
+    setActiveModal(null);
+    alert(`Thank you! "${newBook.title}" has been registered. Please send or drop off your book at 2 Harrison St, Fl 6!`);
   };
 
   // Filter Matching Logic
@@ -227,10 +275,22 @@ export default function Home() {
           </div>
           <h1 className="font-serif text-4xl md:text-5xl text-wharton-navy tracking-tight">Glover Library</h1>
         </div>
-        <div className="flex gap-3 text-sm font-medium">
+        <div className="flex flex-wrap gap-2 md:gap-3 text-sm font-medium">
+          <button 
+            onClick={() => setActiveModal('donate')}
+            className="flex items-center gap-2 border border-wharton-navy/20 text-wharton-navy px-3.5 py-2 text-xs tracking-wider uppercase hover:bg-wharton-navy hover:text-white transition-colors"
+          >
+            <Gift className="w-4 h-4 text-wharton-red" /> Donate Book
+          </button>
+          <button 
+            onClick={() => handleSimulateReturnScan()}
+            className="flex items-center gap-2 border border-wharton-navy/20 text-wharton-navy px-3.5 py-2 text-xs tracking-wider uppercase hover:bg-wharton-navy hover:text-white transition-colors"
+          >
+            <RotateCcw className="w-4 h-4 text-wharton-red" /> Return Book
+          </button>
           <button 
             onClick={() => setActiveModal('verify')}
-            className={`flex items-center gap-2 border px-4 py-2.5 text-xs tracking-wider uppercase transition-colors ${user.isVerified ? 'border-emerald-700 text-emerald-800 bg-emerald-50' : 'border-wharton-navy/20 text-wharton-navy hover:bg-wharton-navy hover:text-white'}`}
+            className={`flex items-center gap-2 border px-3.5 py-2 text-xs tracking-wider uppercase transition-colors ${user.isVerified ? 'border-emerald-700 text-emerald-800 bg-emerald-50' : 'border-wharton-navy/20 text-wharton-navy hover:bg-wharton-navy hover:text-white'}`}
           >
             <Camera className="w-4 h-4 text-wharton-red" /> {user.isVerified ? '✓ PennID Verified' : 'PennID Verify'}
           </button>
@@ -341,7 +401,14 @@ export default function Home() {
                     </span>
                   )}
                 </div>
-                {!book.isCheckedOut && (
+                {book.isCheckedOut ? (
+                  <button 
+                    onClick={() => handleSimulateReturnScan(book)}
+                    className="bg-emerald-700 text-white px-3 py-1.5 text-xs uppercase tracking-wider hover:bg-emerald-800 transition-colors flex items-center gap-1.5"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" /> Return
+                  </button>
+                ) : (
                   <button 
                     onClick={() => handleSimulateScan(book)}
                     className="bg-wharton-navy text-white px-3 py-1.5 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center gap-1.5"
@@ -355,7 +422,99 @@ export default function Home() {
         </div>
       </section>
 
-      {/* MODAL 1: RFID Tag Scanning Modal */}
+      {/* MODAL 1: Donate a Book Modal */}
+      {activeModal === 'donate' && (
+        <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-canvas border border-wharton-navy max-w-md w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 text-wharton-navy/50 hover:text-wharton-navy"><X className="w-5 h-5" /></button>
+            <div className="flex items-center gap-2 text-wharton-red text-xs uppercase tracking-widest font-semibold mb-1">
+              <Gift className="w-4 h-4" /> Cohort Contribution
+            </div>
+            <h3 className="font-serif text-2xl text-wharton-navy mb-1">Donate a Book</h3>
+            <p className="text-xs text-subtle mb-4">Enrich our Floor 6 collection by contributing a book from your executive shelf.</p>
+
+            {/* Drop-Off & Mailing Address Box */}
+            <div className="bg-white p-3.5 border-l-2 border-wharton-red border-y border-r border-wharton-navy/15 mb-5 text-xs">
+              <span className="text-[10px] uppercase tracking-widest text-wharton-red font-bold block mb-1">Ship or Drop Off Books To:</span>
+              <p className="font-serif text-sm font-semibold text-wharton-navy">Glover Library / Pooja</p>
+              <p className="text-charcoal/90 mt-0.5">2 Harrison St, Fl 6</p>
+              <p className="text-charcoal/90">San Francisco, CA 94105</p>
+            </div>
+
+            <form onSubmit={handleDonateBookSubmit} className="space-y-3 text-sm">
+              <div>
+                <label className="block text-[10px] uppercase text-subtle mb-1 font-semibold">Book Title *</label>
+                <input 
+                  type="text" 
+                  value={donationForm.title} 
+                  onChange={(e) => setDonationForm({...donationForm, title: e.target.value})} 
+                  placeholder="e.g. Good to Great"
+                  className="w-full bg-white border border-wharton-navy/20 p-2 font-serif text-wharton-navy" 
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] uppercase text-subtle mb-1 font-semibold">Author Name *</label>
+                <input 
+                  type="text" 
+                  value={donationForm.author} 
+                  onChange={(e) => setDonationForm({...donationForm, author: e.target.value})} 
+                  placeholder="e.g. Jim Collins"
+                  className="w-full bg-white border border-wharton-navy/20 p-2 font-serif text-wharton-navy" 
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px] uppercase text-subtle mb-1 font-semibold">Category / Primary Tag *</label>
+                <select 
+                  value={donationForm.tag} 
+                  onChange={(e) => setDonationForm({...donationForm, tag: e.target.value})}
+                  className="w-full bg-white border border-wharton-navy/20 p-2 font-serif text-wharton-navy"
+                >
+                  {whartonTags.filter(t => t !== 'All').map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-2 border-t border-wharton-navy/10">
+                <div>
+                  <label className="block text-[10px] uppercase text-subtle mb-1 font-semibold">Your Name (Donor Credit) *</label>
+                  <input 
+                    type="text" 
+                    value={donationForm.donorName || user.name} 
+                    onChange={(e) => setDonationForm({...donationForm, donorName: e.target.value})} 
+                    placeholder="e.g. Gerald Glover"
+                    className="w-full bg-white border border-wharton-navy/20 p-2 font-serif text-wharton-navy" 
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase text-subtle mb-1 font-semibold">Cohort / Program *</label>
+                  <input 
+                    type="text" 
+                    value={donationForm.donorCohort} 
+                    onChange={(e) => setDonationForm({...donationForm, donorCohort: e.target.value})} 
+                    placeholder="e.g. WG'26"
+                    className="w-full bg-white border border-wharton-navy/20 p-2 font-serif text-wharton-navy" 
+                  />
+                </div>
+              </div>
+
+              <button 
+                type="submit"
+                className="w-full mt-6 bg-wharton-navy text-white py-3 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center justify-center gap-2"
+              >
+                <Gift className="w-4 h-4" /> Register & Submit Donation
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: RFID Checkout Scanning Modal */}
       {activeModal === 'rfid-scanning' && selectedBook && (
         <div className="fixed inset-0 bg-wharton-navy/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-white border-2 border-wharton-navy max-w-sm w-full p-8 shadow-2xl text-center">
@@ -366,7 +525,18 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL 2: PennID Verification Modal */}
+      {/* MODAL 3: RFID Return Scanning Modal */}
+      {activeModal === 'return-scanning' && selectedBook && (
+        <div className="fixed inset-0 bg-wharton-navy/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-white border-2 border-wharton-navy max-w-sm w-full p-8 shadow-2xl text-center">
+            <RotateCcw className="w-12 h-12 text-emerald-700 mx-auto mb-4 animate-spin" />
+            <h3 className="font-serif text-2xl text-wharton-navy mb-2">Scanning Tag for Return...</h3>
+            <p className="text-xs text-subtle">Reading RFID drop-off tag for <strong>"{selectedBook.title}"</strong>.</p>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 4: PennID Verification Modal */}
       {activeModal === 'verify' && (
         <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-canvas border border-wharton-navy max-w-md w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
@@ -481,7 +651,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL 3: Product Detail Page (PDP) */}
+      {/* MODAL 5: Product Detail Page (PDP) */}
       {activeModal === 'pdp' && selectedBook && (
         <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-canvas border border-wharton-navy max-w-lg w-full p-8 shadow-2xl relative">
@@ -517,7 +687,14 @@ export default function Home() {
                   <span className="text-emerald-700 font-medium">● Available at 2 Harrison St (Fl 6)</span>
                 )}
               </div>
-              {!selectedBook.isCheckedOut && (
+              {selectedBook.isCheckedOut ? (
+                <button 
+                  onClick={() => handleSimulateReturnScan(selectedBook)}
+                  className="bg-emerald-700 text-white px-4 py-2 text-xs uppercase tracking-wider hover:bg-emerald-800 transition-colors flex items-center gap-2"
+                >
+                  <RotateCcw className="w-4 h-4" /> Scan to Return
+                </button>
+              ) : (
                 <button 
                   onClick={() => handleSimulateScan(selectedBook)}
                   className="bg-wharton-navy text-white px-4 py-2 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center gap-2"
@@ -530,7 +707,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL 4: Book Recognized -> Checkout Option */}
+      {/* MODAL 6: Checkout Confirmation Modal */}
       {activeModal === 'checkout' && selectedBook && (
         <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-canvas border border-wharton-navy max-w-md w-full p-6 shadow-2xl relative">
@@ -544,7 +721,7 @@ export default function Home() {
             <div className="bg-white p-4 border border-wharton-navy/10 space-y-2 text-xs mb-6">
               <div className="flex justify-between"><span className="text-subtle">Author:</span> <span className="font-medium">{selectedBook.author}</span></div>
               <div className="flex justify-between"><span className="text-subtle">Shelf Location:</span> <span className="font-medium text-wharton-red">{selectedBook.shelf}</span></div>
-              <div className="flex justify-between"><span className="text-subtle">Patron:</span> <span className="font-medium">{user.name} ({user.cohort})</span></div>
+              <div className="flex justify-between"><span className="text-subtle">Patron:</span> <span className="font-medium">{user.name || 'Gerald Glover'} ({user.cohort})</span></div>
             </div>
 
             <button 
@@ -552,6 +729,33 @@ export default function Home() {
               className="w-full bg-wharton-navy text-white py-3 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center justify-center gap-2"
             >
               <CheckCircle2 className="w-4 h-4" /> Confirm Honor Checkout
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 7: Return Confirmation Modal */}
+      {activeModal === 'return-confirm' && selectedBook && (
+        <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-canvas border border-wharton-navy max-w-md w-full p-6 shadow-2xl relative">
+            <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 text-wharton-navy/50 hover:text-wharton-navy"><X className="w-5 h-5" /></button>
+            
+            <div className="flex items-center gap-2 text-emerald-700 text-xs uppercase tracking-widest font-semibold mb-1">
+              <CheckCircle2 className="w-4 h-4" /> Return Tag Recognized
+            </div>
+            <h3 className="font-serif text-2xl text-wharton-navy mt-1 mb-4">{selectedBook.title}</h3>
+
+            <div className="bg-white p-4 border border-wharton-navy/10 space-y-2 text-xs mb-6">
+              <div className="flex justify-between"><span className="text-subtle">Author:</span> <span className="font-medium">{selectedBook.author}</span></div>
+              <div className="flex justify-between"><span className="text-subtle">Shelf Location:</span> <span className="font-medium text-wharton-red">{selectedBook.shelf}</span></div>
+              <div className="flex justify-between"><span className="text-subtle">Current Borrower:</span> <span className="font-medium">{selectedBook.checkedOutBy || 'Patron'}</span></div>
+            </div>
+
+            <button 
+              onClick={() => handleConfirmReturn(selectedBook.id)}
+              className="w-full bg-emerald-700 text-white py-3 text-xs uppercase tracking-wider hover:bg-emerald-800 transition-colors flex items-center justify-center gap-2"
+            >
+              <CheckCircle2 className="w-4 h-4" /> Confirm Return to Shelf
             </button>
           </div>
         </div>
