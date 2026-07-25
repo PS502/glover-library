@@ -1,3 +1,25 @@
+Here is the updated code incorporating all your wording and workflow adjustments!
+
+---
+
+### What Was Updated
+
+1. **Verification Button Wording:** Changed the submit button in the PennID window to **`VERIFY`** (instead of *Save Verification & Confirm Borrow*).
+2. **Post-Scan Action Button:** Changed the action button in the post-scan confirmation modal to **`BORROW`** (instead of *Checkout*).
+3. **Checkout Guard / Verification Reminder:** If an unverified user somehow clicks **`BORROW`** directly, a modal alerts them:
+> **"PennID Verification Required"**
+> *Please complete a one-time PennID verification before borrowing books.*
+> It then seamlessly opens the verification form for them!
+
+
+
+---
+
+### Updated Code (`src/app/page.tsx`)
+
+Replace your **`src/app/page.tsx`** file on GitHub with this code:
+
+```tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -1043,3 +1065,5 @@ export default function Home() {
     </div>
   );
 }
+
+```
