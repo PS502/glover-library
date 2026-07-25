@@ -1,7 +1,32 @@
+Here is the updated code incorporating **Option A: Integrated Admin Mode**!
+
+Librarians can now unlock a dedicated management dashboard right inside the app using the passcode **`Bound2BeAGoodBook`**.
+
+---
+
+### Key Admin Features Added
+
+1. **Admin Portal Button:** A subtle **`Admin`** lock icon in the header navigation.
+2. **Passcode Protection Modal:** Prompts for the passcode **`Bound2BeAGoodBook`** before granting access.
+3. **Comprehensive Management Dashboard (`/admin` mode):**
+* **Real-time Inventory Overview:** Filter by stock status (`All`, `In Stock`, `Checked Out`).
+* **Manual Overrides:** Instantly toggle book availability or force check-in/checkout without scanning.
+* **CSV Export:** One-click button to download the entire library collection as a `.csv` file for backup/spreadsheet tracking.
+* **Patron Verification Ledger:** Displays verified patron records with extracted PennID numbers and emails.
+
+
+
+---
+
+### Updated Code (`src/app/page.tsx`)
+
+Replace your **`src/app/page.tsx`** file on GitHub with this code:
+
+```tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Camera, Sparkles, MapPin, HeartHandshake, CheckCircle2, X, Radio, Upload, AlertCircle, RotateCcw, Gift } from 'lucide-react';
+import { Search, Camera, Sparkles, MapPin, HeartHandshake, CheckCircle2, X, Radio, Upload, AlertCircle, RotateCcw, Gift, ShieldCheck, Lock, Download, RefreshCw } from 'lucide-react';
 
 interface Book {
   id: string;
@@ -27,6 +52,11 @@ export default function Home() {
     pennIdPhoto: null as string | null,
   });
 
+  // Admin Mode States
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [adminPasscode, setAdminPasscode] = useState('');
+  const [adminError, setAdminError] = useState(false);
+
   useEffect(() => {
     const savedUser = localStorage.getItem('glover_library_user');
     if (savedUser) {
@@ -43,10 +73,11 @@ export default function Home() {
 
   const [uploadPreview, setUploadPreview] = useState<string | null>(null);
   const [isScanningPhoto, setIsScanningPhoto] = useState(false);
-  const [activeModal, setActiveModal] = useState<'verify' | 'pdp' | 'rfid-scanning' | 'return-scanning' | 'checkout' | 'return-confirm' | 'donate' | null>(null);
+  const [activeModal, setActiveModal] = useState<'verify' | 'pdp' | 'rfid-scanning' | 'return-scanning' | 'checkout' | 'return-confirm' | 'donate' | 'admin-login' | 'admin-panel' | null>(null);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTag, setFilterTag] = useState('All');
+  const [adminStockFilter, setAdminStockFilter] = useState<'all' | 'in-stock' | 'checked-out'>('all');
 
   const [donationForm, setDonationForm] = useState({
     title: '',
@@ -167,6 +198,46 @@ export default function Home() {
     { id: '91', title: "Working Backwards", author: "Colin Bryar & Bill Carr", isbn: "978-1250267597", tags: ["Operations", "Scaling", "Leadership & Culture"], shelf: "Dewey 658 - Amazon Culture", isCheckedOut: false }
   ]);
 
+  // Admin Authentication Handler
+  const handleAdminLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (adminPasscode === 'Bound2BeAGoodBook') {
+      setIsAdminLoggedIn(true);
+      setAdminError(false);
+      setActiveModal('admin-panel');
+    } else {
+      setAdminError(true);
+    }
+  };
+
+  // Toggle Manual Override Check-in / Checkout
+  const handleToggleStockStatus = (bookId: string) => {
+    setBooks(prev => prev.map(b => {
+      if (b.id === bookId) {
+        return {
+          ...b,
+          isCheckedOut: !b.isCheckedOut,
+          checkedOutBy: !b.isCheckedOut ? (user.name || 'Admin Override') : undefined
+        };
+      }
+      return b;
+    }));
+  };
+
+  // Export Catalog as CSV File
+  const handleExportCSV = () => {
+    const headers = ["ID,Title,Author,ISBN,Shelf,Status,CheckedOutBy\n"];
+    const rows = books.map(b => 
+      `"${b.id}","${b.title.replace(/"/g, '""')}","${b.author.replace(/"/g, '""')}","${b.isbn || ''}","${b.shelf}","${b.isCheckedOut ? 'Checked Out' : 'In Stock'}","${b.checkedOutBy || ''}"`
+    );
+    const blob = new Blob([...headers, rows.join("\n")], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `glover_library_catalog_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+  };
+
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -284,6 +355,12 @@ export default function Home() {
     return matchesSearch && matchesTag;
   });
 
+  const adminFilteredBooks = books.filter(book => {
+    if (adminStockFilter === 'in-stock') return !book.isCheckedOut;
+    if (adminStockFilter === 'checked-out') return book.isCheckedOut;
+    return true;
+  });
+
   return (
     <div className="min-h-screen bg-canvas text-charcoal font-sans selection:bg-wharton-red selection:text-white">
       {/* Header / Brand Nav */}
@@ -300,20 +377,26 @@ export default function Home() {
         </div>
         <div className="flex flex-wrap gap-2 md:gap-3 text-sm font-medium">
           <button 
+            onClick={() => setActiveModal(isAdminLoggedIn ? 'admin-panel' : 'admin-login')}
+            className="flex items-center gap-1.5 border border-wharton-navy/20 text-wharton-navy px-3 py-2 text-xs tracking-wider uppercase hover:bg-wharton-navy hover:text-white transition-colors"
+          >
+            <Lock className="w-3.5 h-3.5 text-wharton-red" /> {isAdminLoggedIn ? 'Admin Active' : 'Admin'}
+          </button>
+          <button 
             onClick={() => setActiveModal('donate')}
-            className="flex items-center gap-2 border border-wharton-navy/20 text-wharton-navy px-3.5 py-2 text-xs tracking-wider uppercase hover:bg-wharton-navy hover:text-white transition-colors"
+            className="flex items-center gap-1.5 border border-wharton-navy/20 text-wharton-navy px-3.5 py-2 text-xs tracking-wider uppercase hover:bg-wharton-navy hover:text-white transition-colors"
           >
             <Gift className="w-4 h-4 text-wharton-red" /> Donate Book
           </button>
           <button 
             onClick={() => handleSimulateReturnScan()}
-            className="flex items-center gap-2 border border-wharton-navy/20 text-wharton-navy px-3.5 py-2 text-xs tracking-wider uppercase hover:bg-wharton-navy hover:text-white transition-colors"
+            className="flex items-center gap-1.5 border border-wharton-navy/20 text-wharton-navy px-3.5 py-2 text-xs tracking-wider uppercase hover:bg-wharton-navy hover:text-white transition-colors"
           >
             <RotateCcw className="w-4 h-4 text-wharton-red" /> Return Book
           </button>
           <button 
             onClick={() => setActiveModal('verify')}
-            className={`flex items-center gap-2 border px-3.5 py-2 text-xs tracking-wider uppercase transition-colors ${user.isVerified ? 'border-emerald-700 text-emerald-800 bg-emerald-50' : 'border-wharton-navy/20 text-wharton-navy hover:bg-wharton-navy hover:text-white'}`}
+            className={`flex items-center gap-1.5 border px-3.5 py-2 text-xs tracking-wider uppercase transition-colors ${user.isVerified ? 'border-emerald-700 text-emerald-800 bg-emerald-50' : 'border-wharton-navy/20 text-wharton-navy hover:bg-wharton-navy hover:text-white'}`}
           >
             <Camera className="w-4 h-4 text-wharton-red" /> {user.isVerified ? '✓ PennID Verified' : 'PennID Verify'}
           </button>
@@ -446,7 +529,159 @@ export default function Home() {
         </div>
       </section>
 
-      {/* MODAL 1: Donate a Book Modal */}
+      {/* MODAL 1: Admin Passcode Login */}
+      {activeModal === 'admin-login' && (
+        <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-canvas border border-wharton-navy max-w-sm w-full p-6 shadow-2xl relative">
+            <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 text-wharton-navy/50 hover:text-wharton-navy"><X className="w-5 h-5" /></button>
+            <div className="flex items-center gap-2 text-wharton-red text-xs uppercase tracking-widest font-semibold mb-1">
+              <ShieldCheck className="w-4 h-4" /> Librarian Access
+            </div>
+            <h3 className="font-serif text-2xl text-wharton-navy mb-2">Admin Portal</h3>
+            <p className="text-xs text-subtle mb-4">Enter passcode to unlock catalog controls and patron audit log.</p>
+
+            <form onSubmit={handleAdminLoginSubmit} className="space-y-4">
+              <div>
+                <label className="block text-[10px] uppercase text-subtle mb-1 font-semibold">Librarian Passcode *</label>
+                <input 
+                  type="password" 
+                  value={adminPasscode} 
+                  onChange={(e) => setAdminPasscode(e.target.value)} 
+                  placeholder="Enter passcode..."
+                  className="w-full bg-white border border-wharton-navy/20 p-2.5 font-serif text-wharton-navy text-center tracking-widest"
+                  required
+                />
+              </div>
+
+              {adminError && (
+                <p className="text-xs text-wharton-red font-medium text-center">Incorrect passcode. Please try again.</p>
+              )}
+
+              <button 
+                type="submit"
+                className="w-full bg-wharton-navy text-white py-3 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center justify-center gap-2"
+              >
+                <Lock className="w-4 h-4" /> Unlock Admin Dashboard
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: Admin Dashboard Panel */}
+      {activeModal === 'admin-panel' && (
+        <div className="fixed inset-0 bg-wharton-navy/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-canvas border border-wharton-navy max-w-4xl w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 text-wharton-navy/50 hover:text-wharton-navy"><X className="w-5 h-5" /></button>
+            
+            <div className="flex justify-between items-start mb-6 border-b border-wharton-navy/10 pb-4">
+              <div>
+                <div className="flex items-center gap-2 text-emerald-700 text-xs uppercase tracking-widest font-semibold mb-1">
+                  <ShieldCheck className="w-4 h-4" /> Integrated Admin Mode Active
+                </div>
+                <h3 className="font-serif text-3xl text-wharton-navy">Librarian Dashboard</h3>
+              </div>
+              <button 
+                onClick={handleExportCSV}
+                className="bg-wharton-navy text-white px-3.5 py-2 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" /> Export Catalog CSV
+              </button>
+            </div>
+
+            {/* Admin Controls & Stock Filter */}
+            <div className="flex justify-between items-center mb-4 text-xs">
+              <span className="font-serif text-base text-wharton-navy font-semibold">
+                Inventory Status ({adminFilteredBooks.length} titles)
+              </span>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setAdminStockFilter('all')}
+                  className={`px-3 py-1 border ${adminStockFilter === 'all' ? 'bg-wharton-navy text-white' : 'bg-white'}`}
+                >
+                  All ({books.length})
+                </button>
+                <button 
+                  onClick={() => setAdminStockFilter('in-stock')}
+                  className={`px-3 py-1 border ${adminStockFilter === 'in-stock' ? 'bg-emerald-800 text-white' : 'bg-white'}`}
+                >
+                  In Stock ({books.filter(b => !b.isCheckedOut).length})
+                </button>
+                <button 
+                  onClick={() => setAdminStockFilter('checked-out')}
+                  className={`px-3 py-1 border ${adminStockFilter === 'checked-out' ? 'bg-wharton-red text-white' : 'bg-white'}`}
+                >
+                  Checked Out ({books.filter(b => b.isCheckedOut).length})
+                </button>
+              </div>
+            </div>
+
+            {/* Master Inventory Table */}
+            <div className="bg-white border border-wharton-navy/15 overflow-x-auto mb-6">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-wharton-navy text-canvas uppercase tracking-wider font-semibold border-b border-wharton-navy/20">
+                  <tr>
+                    <th className="p-3">Title & Author</th>
+                    <th className="p-3">Shelf</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3">Borrower</th>
+                    <th className="p-3 text-right">Override Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-wharton-navy/10">
+                  {adminFilteredBooks.map((b) => (
+                    <tr key={b.id} className="hover:bg-canvas/50">
+                      <td className="p-3 font-serif">
+                        <span className="font-semibold text-wharton-navy block">{b.title}</span>
+                        <span className="text-subtle text-[11px]">{b.author}</span>
+                      </td>
+                      <td className="p-3 text-wharton-red font-medium">{b.shelf}</td>
+                      <td className="p-3">
+                        {b.isCheckedOut ? (
+                          <span className="text-wharton-red font-semibold">● Checked Out</span>
+                        ) : (
+                          <span className="text-emerald-700 font-semibold">● In Stock</span>
+                        )}
+                      </td>
+                      <td className="p-3 font-medium text-charcoal/80">
+                        {b.checkedOutBy || '—'}
+                      </td>
+                      <td className="p-3 text-right">
+                        <button 
+                          onClick={() => handleToggleStockStatus(b.id)}
+                          className="border border-wharton-navy/20 px-2.5 py-1 text-[11px] uppercase tracking-wider hover:bg-wharton-navy hover:text-white transition-colors inline-flex items-center gap-1"
+                        >
+                          <RefreshCw className="w-3 h-3" /> Toggle Status
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Patron Verification Log */}
+            <div className="border-t border-wharton-navy/10 pt-4">
+              <h4 className="font-serif text-lg text-wharton-navy mb-2">Verified Patron Audit Log</h4>
+              {user.isVerified ? (
+                <div className="bg-white p-4 border border-wharton-navy/15 text-xs flex justify-between items-center">
+                  <div>
+                    <p className="font-serif text-sm font-semibold text-wharton-navy">{user.name} ({user.cohort})</p>
+                    <p className="text-subtle">PennID: {user.pennId} • {user.email} • {user.phone}</p>
+                  </div>
+                  <span className="text-emerald-800 font-semibold bg-emerald-50 border border-emerald-700/20 px-2.5 py-1">
+                    ✓ PennID Photo Verified
+                  </span>
+                </div>
+              ) : (
+                <p className="text-xs text-subtle italic">No patrons currently active in device session.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: Donate a Book Modal */}
       {activeModal === 'donate' && (
         <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-canvas border border-wharton-navy max-w-md w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
@@ -537,7 +772,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL 2: RFID Checkout Scanning Modal */}
+      {/* MODAL 4: RFID Checkout Scanning Modal */}
       {activeModal === 'rfid-scanning' && selectedBook && (
         <div className="fixed inset-0 bg-wharton-navy/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-white border-2 border-wharton-navy max-w-sm w-full p-8 shadow-2xl text-center">
@@ -548,7 +783,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL 3: RFID Return Scanning Modal */}
+      {/* MODAL 5: RFID Return Scanning Modal */}
       {activeModal === 'return-scanning' && selectedBook && (
         <div className="fixed inset-0 bg-wharton-navy/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
           <div className="bg-white border-2 border-wharton-navy max-w-sm w-full p-8 shadow-2xl text-center">
@@ -559,7 +794,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL 4: PennID Verification Modal */}
+      {/* MODAL 6: PennID Verification Modal */}
       {activeModal === 'verify' && (
         <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-canvas border border-wharton-navy max-w-md w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
@@ -643,7 +878,7 @@ export default function Home() {
               </div>
 
               <div>
-                <label className="block text-[10px] uppercase text-subtle mb-1">Email *</label>
+                <label className="block text-[10px] uppercase text-subtle mb-1 font-semibold">Email *</label>
                 <input 
                   type="email" 
                   value={user.email} 
@@ -674,7 +909,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL 5: Product Detail Page (PDP) */}
+      {/* MODAL 7: Product Detail Page (PDP) */}
       {activeModal === 'pdp' && selectedBook && (
         <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-canvas border border-wharton-navy max-w-lg w-full p-8 shadow-2xl relative">
@@ -731,7 +966,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL 6: Checkout Confirmation Modal */}
+      {/* MODAL 8: Checkout Confirmation Modal */}
       {activeModal === 'checkout' && selectedBook && (
         <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-canvas border border-wharton-navy max-w-md w-full p-6 shadow-2xl relative">
@@ -758,7 +993,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* MODAL 7: Return Confirmation Modal */}
+      {/* MODAL 9: Return Confirmation Modal */}
       {activeModal === 'return-confirm' && selectedBook && (
         <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-canvas border border-wharton-navy max-w-md w-full p-6 shadow-2xl relative">
@@ -793,3 +1028,5 @@ export default function Home() {
     </div>
   );
 }
+
+```
