@@ -1,20 +1,3 @@
-Here is the updated code implementing **multi-category filtering**!
-
----
-
-### What Was Updated
-
-1. **Multi-Select Tag State:** Converted the tag filter to support multiple active selections at once.
-2. **Toggle Functionality:** Clicking a category tag toggles it on or off. Clicking **"All"** resets the filters.
-3. **OR Filter Matching:** The catalog now displays any book that matches **at least one** of your selected category tags.
-
----
-
-### Clean Code (`src/app/page.tsx`)
-
-Replace your **`src/app/page.tsx`** file on GitHub with this code:
-
-```tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -243,7 +226,7 @@ export default function Home() {
   const handleExportCSV = () => {
     const headers = ["ID,Title,Author,ISBN,Shelf,Status,CheckedOutBy,DueDate\n"];
     const rows = books.map(b => 
-      `"${b.id}","${b.title.replace(/"/g, '""')}","${b.author.replace(/"/g, '""')}","${b.isbn || ''}","${b.shelf}","${b.isCheckedOut ? 'Checked Out' : 'Available'}","${b.checkedOutBy || ''}","${b.dueDate || ''}"`
+      `"${b.id}","${b.title.replace(/"/g, '""')}","${b.author.replace(/"/g, '""')}","${b.isbn || ''}","${b.shelf}","${b.isCheckedOut ? 'Borrowed' : 'Available'}","${b.checkedOutBy || ''}","${b.dueDate || ''}"`
     );
     const blob = new Blob([...headers, rows.join("\n")], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -528,7 +511,7 @@ export default function Home() {
                 <div>
                   {book.isCheckedOut ? (
                     <span className="text-wharton-red font-medium flex items-center gap-1">
-                      ● Checked out by {book.checkedOutBy}
+                      ● Borrowed
                     </span>
                   ) : (
                     <span className="text-emerald-700 font-medium flex items-center gap-1">
@@ -639,7 +622,7 @@ export default function Home() {
                   onClick={() => setAdminStockFilter('checked-out')}
                   className={`px-3 py-1 border ${adminStockFilter === 'checked-out' ? 'bg-wharton-red text-white' : 'bg-white'}`}
                 >
-                  Checked Out ({books.filter(b => b.isCheckedOut).length})
+                  Borrowed ({books.filter(b => b.isCheckedOut).length})
                 </button>
               </div>
             </div>
@@ -652,7 +635,7 @@ export default function Home() {
                     <th className="p-3">Title & Author</th>
                     <th className="p-3">Shelf</th>
                     <th className="p-3">Status</th>
-                    <th className="p-3">Borrower</th>
+                    <th className="p-3">Borrower (Admin View Only)</th>
                     <th className="p-3 text-right">Override Action</th>
                   </tr>
                 </thead>
@@ -666,13 +649,13 @@ export default function Home() {
                       <td className="p-3 text-wharton-red font-medium">{b.shelf}</td>
                       <td className="p-3">
                         {b.isCheckedOut ? (
-                          <span className="text-wharton-red font-semibold">● Checked Out</span>
+                          <span className="text-wharton-red font-semibold">● Borrowed</span>
                         ) : (
                           <span className="text-emerald-700 font-semibold">● Available</span>
                         )}
                       </td>
                       <td className="p-3 font-medium text-charcoal/80">
-                        {b.checkedOutBy || '—'}
+                        {b.checkedOutBy ? `Checked out by ${b.checkedOutBy}` : '—'}
                       </td>
                       <td className="p-3 text-right">
                         <button 
@@ -989,7 +972,7 @@ export default function Home() {
             <div className="pt-4 border-t border-wharton-navy/10 flex justify-between items-center text-xs">
               <div>
                 {selectedBook.isCheckedOut ? (
-                  <span className="text-wharton-red font-medium">Checked out by {selectedBook.checkedOutBy}</span>
+                  <span className="text-wharton-red font-medium">● Borrowed</span>
                 ) : (
                   <span className="text-emerald-700 font-medium">● Available</span>
                 )}
@@ -1059,7 +1042,6 @@ export default function Home() {
             <div className="bg-white p-4 border border-wharton-navy/10 space-y-2 text-xs mb-6">
               <div className="flex justify-between"><span className="text-subtle">Author:</span> <span className="font-medium">{selectedBook.author}</span></div>
               <div className="flex justify-between"><span className="text-subtle">Shelf Location:</span> <span className="font-medium text-wharton-red">{selectedBook.shelf}</span></div>
-              <div className="flex justify-between"><span className="text-subtle">Current Borrower:</span> <span className="font-medium">{selectedBook.checkedOutBy || 'Patron'}</span></div>
             </div>
 
             <button 
@@ -1080,5 +1062,3 @@ export default function Home() {
     </div>
   );
 }
-
-```
