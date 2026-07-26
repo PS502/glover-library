@@ -1,3 +1,20 @@
+Here is the updated code implementing **multi-category filtering**!
+
+---
+
+### What Was Updated
+
+1. **Multi-Select Tag State:** Converted the tag filter to support multiple active selections at once.
+2. **Toggle Functionality:** Clicking a category tag toggles it on or off. Clicking **"All"** resets the filters.
+3. **OR Filter Matching:** The catalog now displays any book that matches **at least one** of your selected category tags.
+
+---
+
+### Clean Code (`src/app/page.tsx`)
+
+Replace your **`src/app/page.tsx`** file on GitHub with this code:
+
+```tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -52,7 +69,7 @@ export default function Home() {
   const [activeModal, setActiveModal] = useState<'verify' | 'pdp' | 'rfid-scanning' | 'return-scanning' | 'checkout' | 'return-confirm' | 'donate' | 'admin-login' | 'admin-panel' | 'verify-reminder' | null>(null);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterTag, setFilterTag] = useState('All');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [adminStockFilter, setAdminStockFilter] = useState<'all' | 'in-stock' | 'checked-out'>('all');
 
   const [donationForm, setDonationForm] = useState({
@@ -78,6 +95,20 @@ export default function Home() {
     'Finance',
     'Literature & Society'
   ];
+
+  // Toggle multi-select tags
+  const handleTagToggle = (tag: string) => {
+    if (tag === 'All') {
+      setSelectedTags([]);
+      return;
+    }
+
+    if (selectedTags.includes(tag)) {
+      setSelectedTags(selectedTags.filter(t => t !== tag));
+    } else {
+      setSelectedTags([...selectedTags, tag]);
+    }
+  };
 
   // Helper to calculate 14-day due date
   const getCalculatedDueDate = () => {
@@ -341,8 +372,8 @@ export default function Home() {
                           book.shelf.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           (book.isbn && book.isbn.includes(searchQuery));
     
-    const matchesTag = filterTag === 'All' || book.tags.includes(filterTag);
-    return matchesSearch && matchesTag;
+    const matchesTags = selectedTags.length === 0 || selectedTags.some(tag => book.tags.includes(tag));
+    return matchesSearch && matchesTags;
   });
 
   const adminFilteredBooks = books.filter(book => {
@@ -441,15 +472,22 @@ export default function Home() {
           
           {/* Multi-Tag Filter Bar */}
           <div className="flex flex-wrap gap-2 text-xs">
-            {whartonTags.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => setFilterTag(tag)}
-                className={`px-3 py-1.5 border transition-colors ${filterTag === tag ? 'bg-wharton-navy text-white border-wharton-navy' : 'bg-white border-wharton-navy/20 text-charcoal hover:border-wharton-navy'}`}
-              >
-                {tag}
-              </button>
-            ))}
+            {whartonTags.map((tag) => {
+              const isSelected = tag === 'All' ? selectedTags.length === 0 : selectedTags.includes(tag);
+              return (
+                <button
+                  key={tag}
+                  onClick={() => handleTagToggle(tag)}
+                  className={`px-3 py-1.5 border transition-colors ${
+                    isSelected 
+                      ? 'bg-wharton-navy text-white border-wharton-navy' 
+                      : 'bg-white border-wharton-navy/20 text-charcoal hover:border-wharton-navy'
+                  }`}
+                >
+                  {tag}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -1042,3 +1080,5 @@ export default function Home() {
     </div>
   );
 }
+
+```
