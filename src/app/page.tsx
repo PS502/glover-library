@@ -1,3 +1,10 @@
+Here is the clean, complete code for **`src/app/page.tsx`** ready to copy and paste directly into your GitHub repository.
+
+---
+
+### Clean Code (`src/app/page.tsx`)
+
+```tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -14,6 +21,8 @@ interface Book {
   isWhartonFaculty?: boolean;
   isCheckedOut: boolean;
   checkedOutBy?: string;
+  borrowerEmail?: string;
+  borrowerPhone?: string;
   dueDate?: string;
 }
 
@@ -211,22 +220,25 @@ export default function Home() {
   const handleToggleStockStatus = (bookId: string) => {
     setBooks(prev => prev.map(b => {
       if (b.id === bookId) {
+        const isCheckingOut = !b.isCheckedOut;
         return {
           ...b,
-          isCheckedOut: !b.isCheckedOut,
-          checkedOutBy: !b.isCheckedOut ? (user.name || 'Admin Override') : undefined,
-          dueDate: !b.isCheckedOut ? getCalculatedDueDate() : undefined
+          isCheckedOut: isCheckingOut,
+          checkedOutBy: isCheckingOut ? (user.name || 'Admin Override') : undefined,
+          borrowerEmail: isCheckingOut ? (user.email || 'N/A') : undefined,
+          borrowerPhone: isCheckingOut ? (user.phone || 'N/A') : undefined,
+          dueDate: isCheckingOut ? getCalculatedDueDate() : undefined
         };
       }
       return b;
     }));
   };
 
-  // Export Catalog as CSV File
+  // Export Catalog as CSV File (Includes Borrower Contact Details)
   const handleExportCSV = () => {
-    const headers = ["ID,Title,Author,ISBN,Shelf,Status,CheckedOutBy,DueDate\n"];
+    const headers = ["ID,Title,Author,ISBN,Shelf,Status,CheckedOutBy,BorrowerEmail,BorrowerPhone,DueDate\n"];
     const rows = books.map(b => 
-      `"${b.id}","${b.title.replace(/"/g, '""')}","${b.author.replace(/"/g, '""')}","${b.isbn || ''}","${b.shelf}","${b.isCheckedOut ? 'Borrowed' : 'Available'}","${b.checkedOutBy || ''}","${b.dueDate || ''}"`
+      `"${b.id}","${b.title.replace(/"/g, '""')}","${b.author.replace(/"/g, '""')}","${b.isbn || ''}","${b.shelf}","${b.isCheckedOut ? 'Borrowed' : 'Available'}","${b.checkedOutBy || ''}","${b.borrowerEmail || ''}","${b.borrowerPhone || ''}","${b.dueDate || ''}"`
     );
     const blob = new Blob([...headers, rows.join("\n")], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -311,7 +323,14 @@ export default function Home() {
   };
 
   const handleConfirmReturn = (bookId: string) => {
-    setBooks(prev => prev.map(b => b.id === bookId ? { ...b, isCheckedOut: false, checkedOutBy: undefined, dueDate: undefined } : b));
+    setBooks(prev => prev.map(b => b.id === bookId ? { 
+      ...b, 
+      isCheckedOut: false, 
+      checkedOutBy: undefined, 
+      borrowerEmail: undefined, 
+      borrowerPhone: undefined, 
+      dueDate: undefined 
+    } : b));
     setActiveModal(null);
   };
 
@@ -322,7 +341,14 @@ export default function Home() {
     }
 
     const calculatedDue = getCalculatedDueDate();
-    setBooks(prev => prev.map(b => b.id === bookId ? { ...b, isCheckedOut: true, checkedOutBy: user.name || 'Gerald Glover', dueDate: calculatedDue } : b));
+    setBooks(prev => prev.map(b => b.id === bookId ? { 
+      ...b, 
+      isCheckedOut: true, 
+      checkedOutBy: user.name || 'Gerald Glover', 
+      borrowerEmail: user.email || '',
+      borrowerPhone: user.phone || '',
+      dueDate: calculatedDue 
+    } : b));
     setActiveModal(null);
   };
 
@@ -635,7 +661,7 @@ export default function Home() {
                     <th className="p-3">Title & Author</th>
                     <th className="p-3">Shelf</th>
                     <th className="p-3">Status</th>
-                    <th className="p-3">Borrower (Admin View Only)</th>
+                    <th className="p-3">Borrower & Contact Details</th>
                     <th className="p-3 text-right">Override Action</th>
                   </tr>
                 </thead>
@@ -655,7 +681,13 @@ export default function Home() {
                         )}
                       </td>
                       <td className="p-3 font-medium text-charcoal/80">
-                        {b.checkedOutBy ? `Checked out by ${b.checkedOutBy}` : '—'}
+                        {b.checkedOutBy ? (
+                          <div>
+                            <span className="font-semibold text-wharton-navy block">{b.checkedOutBy}</span>
+                            <span className="text-subtle text-[10px] block">{b.borrowerEmail || 'No email recorded'}</span>
+                            <span className="text-subtle text-[10px] block">{b.borrowerPhone || 'No phone recorded'}</span>
+                          </div>
+                        ) : '—'}
                       </td>
                       <td className="p-3 text-right">
                         <button 
@@ -1062,3 +1094,5 @@ export default function Home() {
     </div>
   );
 }
+
+```
