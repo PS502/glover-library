@@ -1,8 +1,6 @@
-Here is the clean, complete code for **`src/app/page.tsx`** ready to copy and paste directly into your GitHub repository.
+Here is the clean, raw code for **`src/app/page.tsx`**.
 
----
-
-### Clean Code (`src/app/page.tsx`)
+Make sure when you paste this into GitHub that **line 1 starts directly with `'use client';**` and no introductory text or Markdown headers are at the top of the file!
 
 ```tsx
 'use client';
@@ -334,13 +332,15 @@ export default function Home() {
     setActiveModal(null);
   };
 
-  const handleCheckout = (bookId: string) => {
+  const handleCheckout = async (bookId: string) => {
     if (!user.isVerified) {
       setActiveModal('verify-reminder');
       return;
     }
 
     const calculatedDue = getCalculatedDueDate();
+
+    // 1. Update UI state
     setBooks(prev => prev.map(b => b.id === bookId ? { 
       ...b, 
       isCheckedOut: true, 
@@ -349,7 +349,25 @@ export default function Home() {
       borrowerPhone: user.phone || '',
       dueDate: calculatedDue 
     } : b));
+
     setActiveModal(null);
+
+    // 2. Fire Nodemailer email via UPenn SMTP
+    try {
+      await fetch('/api/send-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userEmail: user.email,
+          userName: user.name || 'WEMBA Patron',
+          bookTitle: selectedBook?.title || 'Book',
+          dueDate: calculatedDue,
+          shelf: selectedBook?.shelf || 'Floor 6 Shelf'
+        }),
+      });
+    } catch (err) {
+      console.error("Failed to trigger checkout email", err);
+    }
   };
 
   const handleDonateBookSubmit = (e: React.FormEvent) => {
