@@ -1,8 +1,3 @@
-Here is the clean, raw code for **`src/app/page.tsx`**.
-
-Make sure when you paste this into GitHub that **line 1 starts directly with `'use client';**` and no introductory text or Markdown headers are at the top of the file!
-
-```tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -1112,5 +1107,3 @@ export default function Home() {
     </div>
   );
 }
-
-```
