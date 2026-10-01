@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Camera, Sparkles, MapPin, HeartHandshake, CheckCircle2, X, Radio, Upload, AlertCircle, RotateCcw, Gift, ShieldCheck, Lock, Download, RefreshCw, Calendar, ShieldAlert } from 'lucide-react';
+import { Search, Sparkles, MapPin, HeartHandshake, CheckCircle2, X, AlertCircle, RotateCcw, Gift, ShieldCheck, Lock, Download, RefreshCw, Calendar, BookOpen, UserCheck, Send } from 'lucide-react';
 
 interface Book {
   id: string;
@@ -15,20 +15,19 @@ interface Book {
   isCheckedOut: boolean;
   checkedOutBy?: string;
   borrowerEmail?: string;
-  borrowerPhone?: string;
   dueDate?: string;
 }
 
 export default function Home() {
   const [user, setUser] = useState({
     name: '',
-    pennId: '',
-    cohort: "WG'26",
     email: '',
-    phone: '',
+    pennKey: '',
     isVerified: false,
-    pennIdPhoto: null as string | null,
   });
+
+  const [verificationError, setVerificationError] = useState('');
+  const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
 
   // Admin Mode States
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
@@ -40,7 +39,7 @@ export default function Home() {
     if (savedUser) {
       try {
         const parsed = JSON.parse(savedUser);
-        if (parsed.isVerified) {
+        if (parsed.isVerified && parsed.email?.toLowerCase().endsWith('penn.edu')) {
           setUser(parsed);
         }
       } catch (e) {
@@ -49,9 +48,7 @@ export default function Home() {
     }
   }, []);
 
-  const [uploadPreview, setUploadPreview] = useState<string | null>(null);
-  const [isScanningPhoto, setIsScanningPhoto] = useState(false);
-  const [activeModal, setActiveModal] = useState<'verify' | 'pdp' | 'rfid-scanning' | 'return-scanning' | 'checkout' | 'return-confirm' | 'donate' | 'admin-login' | 'admin-panel' | 'verify-reminder' | null>(null);
+  const [activeModal, setActiveModal] = useState<'verify' | 'pdp' | 'request-confirm' | 'return-confirm' | 'donate' | 'admin-login' | 'admin-panel' | null>(null);
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -81,13 +78,11 @@ export default function Home() {
     'Literature & Society'
   ];
 
-  // Toggle multi-select tags
   const handleTagToggle = (tag: string) => {
     if (tag === 'All') {
       setSelectedTags([]);
       return;
     }
-
     if (selectedTags.includes(tag)) {
       setSelectedTags(selectedTags.filter(t => t !== tag));
     } else {
@@ -95,11 +90,15 @@ export default function Home() {
     }
   };
 
-  // Helper to calculate 14-day due date
   const getCalculatedDueDate = () => {
     const date = new Date();
     date.setDate(date.getDate() + 14);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const extractPennKey = (emailAddress: string) => {
+    if (!emailAddress.includes('@')) return '';
+    return emailAddress.split('@')[0].trim().toLowerCase();
   };
 
   // Complete Catalog of 91 Books
@@ -197,7 +196,6 @@ export default function Home() {
     { id: '91', title: "Working Backwards", author: "Colin Bryar & Bill Carr", isbn: "978-1250267597", tags: ["Operations", "Scaling", "Leadership & Culture"], shelf: "Dewey 658 - Amazon Culture", isCheckedOut: false }
   ]);
 
-  // Admin Authentication Handler
   const handleAdminLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (adminPasscode === 'Bound2BeAGoodBook') {
@@ -209,7 +207,6 @@ export default function Home() {
     }
   };
 
-  // Toggle Manual Override Check-in / Checkout
   const handleToggleStockStatus = (bookId: string) => {
     setBooks(prev => prev.map(b => {
       if (b.id === bookId) {
@@ -219,7 +216,6 @@ export default function Home() {
           isCheckedOut: isCheckingOut,
           checkedOutBy: isCheckingOut ? (user.name || 'Admin Override') : undefined,
           borrowerEmail: isCheckingOut ? (user.email || 'N/A') : undefined,
-          borrowerPhone: isCheckingOut ? (user.phone || 'N/A') : undefined,
           dueDate: isCheckingOut ? getCalculatedDueDate() : undefined
         };
       }
@@ -227,11 +223,10 @@ export default function Home() {
     }));
   };
 
-  // Export Catalog as CSV File (Includes Borrower Contact Details)
   const handleExportCSV = () => {
-    const headers = ["ID,Title,Author,ISBN,Shelf,Status,CheckedOutBy,BorrowerEmail,BorrowerPhone,DueDate\n"];
+    const headers = ["ID,Title,Author,ISBN,Shelf,Status,CheckedOutBy,BorrowerEmail,DueDate\n"];
     const rows = books.map(b => 
-      `"${b.id}","${b.title.replace(/"/g, '""')}","${b.author.replace(/"/g, '""')}","${b.isbn || ''}","${b.shelf}","${b.isCheckedOut ? 'Borrowed' : 'Available'}","${b.checkedOutBy || ''}","${b.borrowerEmail || ''}","${b.borrowerPhone || ''}","${b.dueDate || ''}"`
+      `"${b.id}","${b.title.replace(/"/g, '""')}","${b.author.replace(/"/g, '""')}","${b.isbn || ''}","${b.shelf}","${b.isCheckedOut ? 'Borrowed' : 'Available'}","${b.checkedOutBy || ''}","${b.borrowerEmail || ''}","${b.dueDate || ''}"`
     );
     const blob = new Blob([...headers, rows.join("\n")], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -241,78 +236,58 @@ export default function Home() {
     a.click();
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setIsScanningPhoto(true);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const photoDataUrl = reader.result as string;
-        setUploadPreview(photoDataUrl);
+  // Verification Handler
+  const handleVerifySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setVerificationError('');
 
-        setTimeout(() => {
-          setUser(prev => ({
-            ...prev,
-            name: prev.name || 'Gerald Glover',
-            pennId: prev.pennId || '84920134',
-            pennIdPhoto: photoDataUrl
-          }));
-          setIsScanningPhoto(false);
-        }, 1200);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleSaveVerification = () => {
-    if (!uploadPreview && !user.pennIdPhoto) {
-      alert("Mandatory: Please upload a photo of your physical PennID card.");
-      return;
-    }
-    if (!user.name || !user.pennId || !user.cohort || !user.email || !user.phone) {
-      alert("Mandatory: All fields (Name, PennID, Program/Cohort, Email, Phone Number) are required to complete verification.");
+    if (!user.name.trim()) {
+      setVerificationError('Full Name is required.');
       return;
     }
 
-    const updatedUser = {
-      ...user,
-      pennIdPhoto: uploadPreview || user.pennIdPhoto,
+    const cleanEmail = user.email.trim().toLowerCase();
+    if (!cleanEmail) {
+      setVerificationError('Penn email is required.');
+      return;
+    }
+
+    if (!cleanEmail.endsWith('penn.edu')) {
+      setVerificationError('Please enter a valid Penn email address ending in penn.edu (e.g. username@wharton.upenn.edu).');
+      return;
+    }
+
+    const derivedPennKey = extractPennKey(cleanEmail);
+
+    const verifiedProfile = {
+      name: user.name.trim(),
+      email: cleanEmail,
+      pennKey: derivedPennKey,
       isVerified: true
     };
-    setUser(updatedUser);
-    localStorage.setItem('glover_library_user', JSON.stringify(updatedUser));
-    
+
+    setUser(verifiedProfile);
+    localStorage.setItem('glover_library_user', JSON.stringify(verifiedProfile));
+
     if (selectedBook) {
-      setActiveModal('checkout');
+      setActiveModal('request-confirm');
     } else {
       setActiveModal(null);
     }
   };
 
-  const handleSimulateScan = (book: Book) => {
+  // Trigger from "Request" button on card or PDP
+  const handleInitiateRequest = (book: Book) => {
     setSelectedBook(book);
-    setActiveModal('rfid-scanning');
-    
-    setTimeout(() => {
-      const savedUser = localStorage.getItem('glover_library_user');
-      const isVerified = user.isVerified || (savedUser && JSON.parse(savedUser).isVerified);
 
-      if (isVerified) {
-        setActiveModal('checkout');
-      } else {
-        setActiveModal('verify');
-      }
-    }, 1500);
-  };
+    const savedUser = localStorage.getItem('glover_library_user');
+    const isAlreadyVerified = user.isVerified || (savedUser && JSON.parse(savedUser).isVerified);
 
-  const handleSimulateReturnScan = (book?: Book) => {
-    const targetBook = book || books.find(b => b.isCheckedOut) || books[0];
-    setSelectedBook(targetBook);
-    setActiveModal('return-scanning');
-    
-    setTimeout(() => {
-      setActiveModal('return-confirm');
-    }, 1500);
+    if (isAlreadyVerified) {
+      setActiveModal('request-confirm');
+    } else {
+      setActiveModal('verify');
+    }
   };
 
   const handleConfirmReturn = (bookId: string) => {
@@ -321,47 +296,53 @@ export default function Home() {
       isCheckedOut: false, 
       checkedOutBy: undefined, 
       borrowerEmail: undefined, 
-      borrowerPhone: undefined, 
       dueDate: undefined 
     } : b));
     setActiveModal(null);
   };
 
-  const handleCheckout = async (bookId: string) => {
-    if (!user.isVerified) {
-      setActiveModal('verify-reminder');
-      return;
-    }
+  // Final Borrow Request Submission
+  const handleConfirmBorrowRequest = async () => {
+    if (!selectedBook) return;
+    setIsSubmittingRequest(true);
 
     const calculatedDue = getCalculatedDueDate();
+    const currentTimestamp = new Date().toLocaleString('en-US', {
+      timeZone: 'America/Los_Angeles',
+      dateStyle: 'full',
+      timeStyle: 'medium',
+    });
 
-    // 1. Update UI state
-    setBooks(prev => prev.map(b => b.id === bookId ? { 
-      ...b, 
-      isCheckedOut: true, 
-      checkedOutBy: user.name || 'Gerald Glover', 
-      borrowerEmail: user.email || '',
-      borrowerPhone: user.phone || '',
-      dueDate: calculatedDue 
+    // 1. Update UI state locally
+    setBooks(prev => prev.map(b => b.id === selectedBook.id ? {
+      ...b,
+      isCheckedOut: true,
+      checkedOutBy: user.name,
+      borrowerEmail: user.email,
+      dueDate: calculatedDue
     } : b));
 
-    setActiveModal(null);
-
-    // 2. Fire Nodemailer email via UPenn SMTP
+    // 2. Fire Nodemailer endpoint
     try {
       await fetch('/api/send-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userEmail: user.email,
-          userName: user.name || 'WEMBA Patron',
-          bookTitle: selectedBook?.title || 'Book',
-          dueDate: calculatedDue,
-          shelf: selectedBook?.shelf || 'Floor 6 Shelf'
+          userName: user.name,
+          pennKey: user.pennKey || extractPennKey(user.email),
+          bookTitle: selectedBook.title,
+          bookAuthor: selectedBook.author,
+          shelf: selectedBook.shelf,
+          requestTimestamp: currentTimestamp
         }),
       });
     } catch (err) {
-      console.error("Failed to trigger checkout email", err);
+      console.error("Failed to notify library admin", err);
+    } finally {
+      setIsSubmittingRequest(false);
+      setActiveModal(null);
+      alert(`Borrow request confirmed! A receipt was sent to ${user.email}, and the librarian team has been notified.`);
     }
   };
 
@@ -385,7 +366,7 @@ export default function Home() {
     setBooks(prev => [newBook, ...prev]);
     setDonationForm({ title: '', author: '', tag: 'Strategic Management', donorName: '', donorCohort: "WG'26" });
     setActiveModal(null);
-    alert(`Thank you! "${newBook.title}" has been registered. Please send or drop off your book at 2 Harrison St, Fl 6!`);
+    alert(`Thank you! "${newBook.title}" has been registered. Please drop off your book at 2 Harrison St, Fl 6!`);
   };
 
   const filteredBooks = books.filter(book => {
@@ -432,7 +413,11 @@ export default function Home() {
             <Gift className="w-4 h-4 text-wharton-red" /> Donate Book
           </button>
           <button 
-            onClick={() => handleSimulateReturnScan()}
+            onClick={() => {
+              const borrowed = books.find(b => b.isCheckedOut) || books[0];
+              setSelectedBook(borrowed);
+              setActiveModal('return-confirm');
+            }}
             className="flex items-center gap-1.5 border border-wharton-navy/20 text-wharton-navy px-3.5 py-2 text-xs tracking-wider uppercase hover:bg-wharton-navy hover:text-white transition-colors"
           >
             <RotateCcw className="w-4 h-4 text-wharton-red" /> Return Book
@@ -441,7 +426,7 @@ export default function Home() {
             onClick={() => setActiveModal('verify')}
             className={`flex items-center gap-1.5 border px-3.5 py-2 text-xs tracking-wider uppercase transition-colors ${user.isVerified ? 'border-emerald-700 text-emerald-800 bg-emerald-50' : 'border-wharton-navy/20 text-wharton-navy hover:bg-wharton-navy hover:text-white'}`}
           >
-            <Camera className="w-4 h-4 text-wharton-red" /> {user.isVerified ? '✓ PennID Verified' : 'PennID Verify'}
+            <UserCheck className="w-4 h-4 text-wharton-red" /> {user.isVerified ? `✓ ${user.name.split(' ')[0]}` : 'Verify PennID'}
           </button>
         </div>
       </header>
@@ -477,7 +462,7 @@ export default function Home() {
           <HeartHandshake className="w-8 h-8 text-wharton-red shrink-0" />
           <div>
             <h4 className="font-serif text-xl text-white">Borrow freely. Return thoughtfully.</h4>
-            <p className="text-xs text-canvas/70 mt-1">Every timely return ensures your classmates have access when they need it.</p>
+            <p className="text-xs text-canvas/70 mt-1">Browse, request in one tap, and pick up on Floor 6 during your class weekends.</p>
           </div>
         </div>
       </section>
@@ -533,7 +518,6 @@ export default function Home() {
                 <p className="text-sm text-charcoal/80 mb-2">{book.author}</p>
                 {book.isbn && <p className="text-[10px] font-mono text-subtle mb-4">ISBN: {book.isbn}</p>}
 
-                {/* Uniform Tag Styling */}
                 <div className="flex flex-wrap gap-1.5 mb-6">
                   {book.tags.map((t, idx) => (
                     <span 
@@ -560,17 +544,17 @@ export default function Home() {
                 </div>
                 {book.isCheckedOut ? (
                   <button 
-                    onClick={() => handleSimulateReturnScan(book)}
+                    onClick={() => { setSelectedBook(book); setActiveModal('return-confirm'); }}
                     className="bg-emerald-700 text-white px-3 py-1.5 text-xs uppercase tracking-wider hover:bg-emerald-800 transition-colors flex items-center gap-1.5"
                   >
                     <RotateCcw className="w-3.5 h-3.5" /> Return
                   </button>
                 ) : (
                   <button 
-                    onClick={() => handleSimulateScan(book)}
-                    className="bg-wharton-navy text-white px-3 py-1.5 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center gap-1.5"
+                    onClick={() => handleInitiateRequest(book)}
+                    className="bg-wharton-navy text-white px-3.5 py-1.5 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center gap-1.5 font-semibold"
                   >
-                    <Radio className="w-3.5 h-3.5" /> Scan
+                    <BookOpen className="w-3.5 h-3.5" /> Request
                   </button>
                 )}
               </div>
@@ -579,165 +563,180 @@ export default function Home() {
         </div>
       </section>
 
-      {/* MODAL 1: Admin Passcode Login */}
-      {activeModal === 'admin-login' && (
+      {/* MODAL 1: PennID Verification Modal */}
+      {activeModal === 'verify' && (
         <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-canvas border border-wharton-navy max-w-sm w-full p-6 shadow-2xl relative">
+          <div className="bg-canvas border border-wharton-navy max-w-md w-full p-6 shadow-2xl relative">
             <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 text-wharton-navy/50 hover:text-wharton-navy"><X className="w-5 h-5" /></button>
             <div className="flex items-center gap-2 text-wharton-red text-xs uppercase tracking-widest font-semibold mb-1">
-              <ShieldCheck className="w-4 h-4" /> Librarian Access
+              <UserCheck className="w-4 h-4" /> Patron Identity Verification
             </div>
-            <h3 className="font-serif text-2xl text-wharton-navy mb-2">Admin Portal</h3>
-            <p className="text-xs text-subtle mb-4">Enter passcode to unlock catalog controls and patron audit log.</p>
+            <h3 className="font-serif text-2xl text-wharton-navy mb-1">Verify PennID</h3>
+            <p className="text-xs text-subtle mb-4">Please enter your full name and official Penn email to request books from Glover Library.</p>
 
-            <form onSubmit={handleAdminLoginSubmit} className="space-y-4">
+            <form onSubmit={handleVerifySubmit} className="space-y-4">
               <div>
-                <label className="block text-[10px] uppercase text-subtle mb-1 font-semibold">Librarian Passcode *</label>
+                <label className="block text-[10px] uppercase text-subtle mb-1 font-semibold">Full Name *</label>
                 <input 
-                  type="password" 
-                  value={adminPasscode} 
-                  onChange={(e) => setAdminPasscode(e.target.value)} 
-                  placeholder="Enter passcode..."
-                  className="w-full bg-white border border-wharton-navy/20 p-2.5 font-serif text-wharton-navy text-center tracking-widest"
+                  type="text" 
+                  value={user.name} 
+                  onChange={(e) => setUser({...user, name: e.target.value})} 
+                  placeholder="e.g. Gerald Glover"
+                  className="w-full bg-white border border-wharton-navy/20 p-2.5 font-serif text-wharton-navy" 
                   required
                 />
               </div>
 
-              {adminError && (
-                <p className="text-xs text-wharton-red font-medium text-center">Incorrect passcode. Please try again.</p>
+              <div>
+                <label className="block text-[10px] uppercase text-subtle mb-1 font-semibold">Penn Email *</label>
+                <input 
+                  type="email" 
+                  value={user.email} 
+                  onChange={(e) => setUser({...user, email: e.target.value})} 
+                  placeholder="username@wharton.upenn.edu"
+                  className="w-full bg-white border border-wharton-navy/20 p-2.5 font-serif text-wharton-navy" 
+                  required
+                />
+                <span className="text-[10px] text-subtle mt-1 block">Must end with <strong>penn.edu</strong></span>
+              </div>
+
+              {verificationError && (
+                <div className="bg-red-50 border border-red-200 text-wharton-red p-2.5 text-xs flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span>{verificationError}</span>
+                </div>
               )}
 
               <button 
                 type="submit"
-                className="w-full bg-wharton-navy text-white py-3 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center justify-center gap-2"
+                className="w-full mt-2 bg-wharton-navy text-white py-3 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors font-semibold flex items-center justify-center gap-2"
               >
-                <Lock className="w-4 h-4" /> Unlock Admin Dashboard
+                <CheckCircle2 className="w-4 h-4" /> VERIFY
               </button>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL 2: Admin Dashboard Panel */}
-      {activeModal === 'admin-panel' && (
-        <div className="fixed inset-0 bg-wharton-navy/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-canvas border border-wharton-navy max-w-4xl w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+      {/* MODAL 2: Request Confirmation Modal */}
+      {activeModal === 'request-confirm' && selectedBook && (
+        <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-canvas border border-wharton-navy max-w-md w-full p-6 shadow-2xl relative">
             <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 text-wharton-navy/50 hover:text-wharton-navy"><X className="w-5 h-5" /></button>
             
-            <div className="flex justify-between items-start mb-6 border-b border-wharton-navy/10 pb-4">
+            <div className="flex items-center gap-2 text-emerald-700 text-xs uppercase tracking-widest font-semibold mb-1">
+              <CheckCircle2 className="w-4 h-4" /> Verified Patron
+            </div>
+            <h3 className="font-serif text-2xl text-wharton-navy mt-1 mb-4">{selectedBook.title}</h3>
+
+            <div className="bg-white p-4 border border-wharton-navy/10 space-y-2.5 text-xs mb-6">
+              <div className="flex justify-between"><span className="text-subtle">Author:</span> <span className="font-medium">{selectedBook.author}</span></div>
+              <div className="flex justify-between"><span className="text-subtle">Shelf Location:</span> <span className="font-medium text-wharton-red">{selectedBook.shelf}</span></div>
+              <div className="flex justify-between"><span className="text-subtle">Patron Name:</span> <span className="font-medium">{user.name}</span></div>
+              <div className="flex justify-between"><span className="text-subtle">PennKey:</span> <span className="font-medium font-mono text-wharton-navy">{user.pennKey || extractPennKey(user.email)}</span></div>
+              <div className="flex justify-between"><span className="text-subtle">Penn Email:</span> <span className="font-medium">{user.email}</span></div>
+              <div className="flex justify-between pt-2 border-t border-wharton-navy/10 font-semibold text-wharton-navy">
+                <span className="flex items-center gap-1 text-wharton-red"><Calendar className="w-3.5 h-3.5" /> Due Date (14 Days):</span> 
+                <span>{getCalculatedDueDate()}</span>
+              </div>
+            </div>
+
+            <button 
+              onClick={handleConfirmBorrowRequest}
+              disabled={isSubmittingRequest}
+              className="w-full bg-wharton-navy text-white py-3 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center justify-center gap-2 font-semibold disabled:opacity-50"
+            >
+              <Send className="w-4 h-4" /> {isSubmittingRequest ? 'Submitting Request...' : 'REQUEST TO BORROW'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: Product Detail Page (PDP) */}
+      {activeModal === 'pdp' && selectedBook && (
+        <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-canvas border border-wharton-navy max-w-lg w-full p-8 shadow-2xl relative">
+            <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 text-wharton-navy/50 hover:text-wharton-navy"><X className="w-5 h-5" /></button>
+            
+            <div className="flex justify-between items-start text-xs text-subtle mb-2">
+              <span className="text-wharton-red font-semibold">{selectedBook.shelf}</span>
+            </div>
+
+            <h2 className="font-serif text-3xl text-wharton-navy mb-1">{selectedBook.title}</h2>
+            <p className="text-base text-charcoal/80 mb-1">{selectedBook.author}</p>
+            {selectedBook.isbn && <p className="text-xs font-mono text-subtle mb-4">ISBN: {selectedBook.isbn}</p>}
+
+            <div className="flex flex-wrap gap-2 mb-6">
+              {selectedBook.tags.map((t, idx) => (
+                <span key={idx} className="bg-white px-2.5 py-1 text-xs text-wharton-navy border border-wharton-navy/20">
+                  {t}
+                </span>
+              ))}
+            </div>
+
+            {selectedBook.recommendedBy && (
+              <div className="bg-white p-4 border-l-2 border-wharton-red border-y border-r border-wharton-navy/10 mb-6 text-xs">
+                <span className="text-[10px] uppercase tracking-widest text-wharton-red font-semibold block mb-1">Recommended By</span>
+                <p className="font-serif text-sm text-wharton-navy">{selectedBook.recommendedBy}</p>
+              </div>
+            )}
+
+            <div className="pt-4 border-t border-wharton-navy/10 flex justify-between items-center text-xs">
               <div>
-                <div className="flex items-center gap-2 text-emerald-700 text-xs uppercase tracking-widest font-semibold mb-1">
-                  <ShieldCheck className="w-4 h-4" /> Integrated Admin Mode Active
-                </div>
-                <h3 className="font-serif text-3xl text-wharton-navy">Librarian Dashboard</h3>
+                {selectedBook.isCheckedOut ? (
+                  <span className="text-wharton-red font-medium">● Borrowed</span>
+                ) : (
+                  <span className="text-emerald-700 font-medium">● Available</span>
+                )}
               </div>
-              <button 
-                onClick={handleExportCSV}
-                className="bg-wharton-navy text-white px-3.5 py-2 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center gap-1.5"
-              >
-                <Download className="w-3.5 h-3.5" /> Export Catalog CSV
-              </button>
-            </div>
-
-            {/* Admin Controls & Stock Filter */}
-            <div className="flex justify-between items-center mb-4 text-xs">
-              <span className="font-serif text-base text-wharton-navy font-semibold">
-                Inventory Status ({adminFilteredBooks.length} titles)
-              </span>
-              <div className="flex gap-2">
+              {selectedBook.isCheckedOut ? (
                 <button 
-                  onClick={() => setAdminStockFilter('all')}
-                  className={`px-3 py-1 border ${adminStockFilter === 'all' ? 'bg-wharton-navy text-white' : 'bg-white'}`}
+                  onClick={() => setActiveModal('return-confirm')}
+                  className="bg-emerald-700 text-white px-4 py-2 text-xs uppercase tracking-wider hover:bg-emerald-800 transition-colors flex items-center gap-2"
                 >
-                  All ({books.length})
+                  <RotateCcw className="w-4 h-4" /> Return to Shelf
                 </button>
-                <button 
-                  onClick={() => setAdminStockFilter('in-stock')}
-                  className={`px-3 py-1 border ${adminStockFilter === 'in-stock' ? 'bg-emerald-800 text-white' : 'bg-white'}`}
-                >
-                  Available ({books.filter(b => !b.isCheckedOut).length})
-                </button>
-                <button 
-                  onClick={() => setAdminStockFilter('checked-out')}
-                  className={`px-3 py-1 border ${adminStockFilter === 'checked-out' ? 'bg-wharton-red text-white' : 'bg-white'}`}
-                >
-                  Borrowed ({books.filter(b => b.isCheckedOut).length})
-                </button>
-              </div>
-            </div>
-
-            {/* Master Inventory Table */}
-            <div className="bg-white border border-wharton-navy/15 overflow-x-auto mb-6">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-wharton-navy text-canvas uppercase tracking-wider font-semibold border-b border-wharton-navy/20">
-                  <tr>
-                    <th className="p-3">Title & Author</th>
-                    <th className="p-3">Shelf</th>
-                    <th className="p-3">Status</th>
-                    <th className="p-3">Borrower & Contact Details</th>
-                    <th className="p-3 text-right">Override Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-wharton-navy/10">
-                  {adminFilteredBooks.map((b) => (
-                    <tr key={b.id} className="hover:bg-canvas/50">
-                      <td className="p-3 font-serif">
-                        <span className="font-semibold text-wharton-navy block">{b.title}</span>
-                        <span className="text-subtle text-[11px]">{b.author}</span>
-                      </td>
-                      <td className="p-3 text-wharton-red font-medium">{b.shelf}</td>
-                      <td className="p-3">
-                        {b.isCheckedOut ? (
-                          <span className="text-wharton-red font-semibold">● Borrowed</span>
-                        ) : (
-                          <span className="text-emerald-700 font-semibold">● Available</span>
-                        )}
-                      </td>
-                      <td className="p-3 font-medium text-charcoal/80">
-                        {b.checkedOutBy ? (
-                          <div>
-                            <span className="font-semibold text-wharton-navy block">{b.checkedOutBy}</span>
-                            <span className="text-subtle text-[10px] block">{b.borrowerEmail || 'No email recorded'}</span>
-                            <span className="text-subtle text-[10px] block">{b.borrowerPhone || 'No phone recorded'}</span>
-                          </div>
-                        ) : '—'}
-                      </td>
-                      <td className="p-3 text-right">
-                        <button 
-                          onClick={() => handleToggleStockStatus(b.id)}
-                          className="border border-wharton-navy/20 px-2.5 py-1 text-[11px] uppercase tracking-wider hover:bg-wharton-navy hover:text-white transition-colors inline-flex items-center gap-1"
-                        >
-                          <RefreshCw className="w-3 h-3" /> Toggle Status
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Patron Verification Log */}
-            <div className="border-t border-wharton-navy/10 pt-4">
-              <h4 className="font-serif text-lg text-wharton-navy mb-2">Verified Patron Audit Log</h4>
-              {user.isVerified ? (
-                <div className="bg-white p-4 border border-wharton-navy/15 text-xs flex justify-between items-center">
-                  <div>
-                    <p className="font-serif text-sm font-semibold text-wharton-navy">{user.name} ({user.cohort})</p>
-                    <p className="text-subtle">PennID: {user.pennId} • {user.email} • {user.phone}</p>
-                  </div>
-                  <span className="text-emerald-800 font-semibold bg-emerald-50 border border-emerald-700/20 px-2.5 py-1">
-                    ✓ PennID Photo Verified
-                  </span>
-                </div>
               ) : (
-                <p className="text-xs text-subtle italic">No patrons currently active in device session.</p>
+                <button 
+                  onClick={() => handleInitiateRequest(selectedBook)}
+                  className="bg-wharton-navy text-white px-4 py-2 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center gap-2 font-semibold"
+                >
+                  <BookOpen className="w-4 h-4" /> Request Book
+                </button>
               )}
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL 3: Donate a Book Modal */}
+      {/* MODAL 4: Return Confirmation Modal */}
+      {activeModal === 'return-confirm' && selectedBook && (
+        <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="bg-canvas border border-wharton-navy max-w-md w-full p-6 shadow-2xl relative">
+            <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 text-wharton-navy/50 hover:text-wharton-navy"><X className="w-5 h-5" /></button>
+            
+            <div className="flex items-center gap-2 text-emerald-700 text-xs uppercase tracking-widest font-semibold mb-1">
+              <CheckCircle2 className="w-4 h-4" /> Book Return Confirmation
+            </div>
+            <h3 className="font-serif text-2xl text-wharton-navy mt-1 mb-4">{selectedBook.title}</h3>
+
+            <div className="bg-white p-4 border border-wharton-navy/10 space-y-2 text-xs mb-6">
+              <div className="flex justify-between"><span className="text-subtle">Author:</span> <span className="font-medium">{selectedBook.author}</span></div>
+              <div className="flex justify-between"><span className="text-subtle">Shelf Location:</span> <span className="font-medium text-wharton-red">{selectedBook.shelf}</span></div>
+              <div className="flex justify-between"><span className="text-subtle">Return Station:</span> <span className="font-medium">2 Harrison St, Fl 6</span></div>
+            </div>
+
+            <button 
+              onClick={() => handleConfirmReturn(selectedBook.id)}
+              className="w-full bg-emerald-700 text-white py-3 text-xs uppercase tracking-wider hover:bg-emerald-800 transition-colors flex items-center justify-center gap-2 font-semibold"
+            >
+              <CheckCircle2 className="w-4 h-4" /> CONFIRM RETURN TO SHELF
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 5: Donate Book Modal */}
       {activeModal === 'donate' && (
         <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-canvas border border-wharton-navy max-w-md w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
@@ -746,7 +745,7 @@ export default function Home() {
               <Gift className="w-4 h-4" /> Cohort Contribution
             </div>
             <h3 className="font-serif text-2xl text-wharton-navy mb-1">Donate a Book</h3>
-            <p className="text-xs text-subtle mb-4">Enrich our Floor 6 collection by contributing a book from your executive shelf.</p>
+            <p className="text-xs text-subtle mb-4">Enrich our collection by contributing a book.</p>
 
             <div className="bg-white p-3.5 border-l-2 border-wharton-red border-y border-r border-wharton-navy/15 mb-5 text-xs">
               <span className="text-[10px] uppercase tracking-widest text-wharton-red font-bold block mb-1">Ship or Drop Off Books To:</span>
@@ -819,282 +818,166 @@ export default function Home() {
 
               <button 
                 type="submit"
-                className="w-full mt-6 bg-wharton-navy text-white py-3 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center justify-center gap-2"
+                className="w-full mt-6 bg-wharton-navy text-white py-3 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center justify-center gap-2 font-semibold"
               >
-                <Gift className="w-4 h-4" /> Register & Submit Donation
+                <Gift className="w-4 h-4" /> CONTRIBUTE
               </button>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL 4: RFID Checkout Scanning Modal */}
-      {activeModal === 'rfid-scanning' && selectedBook && (
-        <div className="fixed inset-0 bg-wharton-navy/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-white border-2 border-wharton-navy max-w-sm w-full p-8 shadow-2xl text-center">
-            <Radio className="w-12 h-12 text-wharton-red mx-auto mb-4 animate-pulse" />
-            <h3 className="font-serif text-2xl text-wharton-navy mb-2">Scanning RFID Tag...</h3>
-            <p className="text-xs text-subtle">Hold device near the RFID tag on inside cover of <strong>"{selectedBook.title}"</strong>.</p>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 5: RFID Return Scanning Modal */}
-      {activeModal === 'return-scanning' && selectedBook && (
-        <div className="fixed inset-0 bg-wharton-navy/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-          <div className="bg-white border-2 border-wharton-navy max-w-sm w-full p-8 shadow-2xl text-center">
-            <RotateCcw className="w-12 h-12 text-emerald-700 mx-auto mb-4 animate-spin" />
-            <h3 className="font-serif text-2xl text-wharton-navy mb-2">Scanning Tag for Return...</h3>
-            <p className="text-xs text-subtle">Reading RFID drop-off tag for <strong>"{selectedBook.title}"</strong>.</p>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 6: PennID Verification Modal */}
-      {activeModal === 'verify' && (
+      {/* MODAL 6: Admin Login Modal */}
+      {activeModal === 'admin-login' && (
         <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-canvas border border-wharton-navy max-w-md w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
+          <div className="bg-canvas border border-wharton-navy max-w-sm w-full p-6 shadow-2xl relative">
             <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 text-wharton-navy/50 hover:text-wharton-navy"><X className="w-5 h-5" /></button>
             <div className="flex items-center gap-2 text-wharton-red text-xs uppercase tracking-widest font-semibold mb-1">
-              <Camera className="w-4 h-4" /> Patron Identity Verification
+              <ShieldCheck className="w-4 h-4" /> Librarian Access
             </div>
-            <h3 className="font-serif text-2xl text-wharton-navy mb-2">PennID Verification</h3>
-            <p className="text-xs text-subtle mb-4">Upload a photo of your physical PennID card. The app will automatically extract your Name and PennID number.</p>
-            
-            <div className="mb-6">
-              <label className="block text-xs uppercase text-subtle mb-2 font-semibold">1. Upload Physical PennID Photo *</label>
-              <div className="border-2 border-dashed border-wharton-navy/30 bg-white p-4 text-center hover:border-wharton-navy transition-colors relative">
-                {isScanningPhoto ? (
-                  <div className="py-6">
-                    <Sparkles className="w-8 h-8 text-wharton-red mx-auto mb-2 animate-spin" />
-                    <span className="text-xs text-wharton-navy font-semibold block">Scanning PennID card & extracting text...</span>
-                  </div>
-                ) : uploadPreview || user.pennIdPhoto ? (
-                  <div className="relative">
-                    <img src={uploadPreview || user.pennIdPhoto!} alt="PennID Preview" className="h-32 mx-auto object-cover border border-wharton-navy/20" />
-                    <span className="block text-[10px] text-emerald-700 font-semibold mt-2">✓ Photo Scanned & Stored for Librarian Audit</span>
-                  </div>
-                ) : (
-                  <div className="py-4">
-                    <Upload className="w-8 h-8 text-wharton-navy/40 mx-auto mb-2" />
-                    <span className="text-xs text-wharton-navy font-medium block">Click to upload or capture PennID</span>
-                    <span className="text-[10px] text-subtle block mt-1">Automatically extracts Name & PennID Number</span>
-                  </div>
-                )}
-                <input type="file" accept="image/*" onChange={handlePhotoUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
-              </div>
-            </div>
+            <h3 className="font-serif text-2xl text-wharton-navy mb-2">Admin Portal</h3>
+            <p className="text-xs text-subtle mb-4">Enter passcode to unlock catalog controls and patron audit log.</p>
 
-            <div className="space-y-3 text-sm border-t border-wharton-navy/10 pt-4">
-              <label className="block text-xs uppercase text-subtle font-semibold">2. Auto-Extracted & Mandatory Fields *</label>
-              
+            <form onSubmit={handleAdminLoginSubmit} className="space-y-4">
               <div>
-                <label className="block text-[10px] uppercase text-subtle mb-1">Full Name (Auto-Extracted) *</label>
+                <label className="block text-[10px] uppercase text-subtle mb-1 font-semibold">Librarian Passcode *</label>
                 <input 
-                  type="text" 
-                  value={user.name} 
-                  onChange={(e) => setUser({...user, name: e.target.value})} 
-                  placeholder="Extracted from photo..."
-                  className="w-full bg-white border border-wharton-navy/20 p-2 font-serif text-wharton-navy" 
+                  type="password" 
+                  value={adminPasscode} 
+                  onChange={(e) => setAdminPasscode(e.target.value)} 
+                  placeholder="Enter passcode..."
+                  className="w-full bg-white border border-wharton-navy/20 p-2.5 font-serif text-wharton-navy text-center tracking-widest"
+                  required
                 />
               </div>
 
-              <div>
-                <label className="block text-[10px] uppercase text-subtle mb-1">PennID Number (Auto-Extracted) *</label>
-                <input 
-                  type="text" 
-                  value={user.pennId} 
-                  onChange={(e) => setUser({...user, pennId: e.target.value})} 
-                  placeholder="Extracted from photo..."
-                  className="w-full bg-white border border-wharton-navy/20 p-2 font-serif text-wharton-navy" 
-                />
-              </div>
+              {adminError && (
+                <p className="text-xs text-wharton-red font-medium text-center">Incorrect passcode. Please try again.</p>
+              )}
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-[10px] uppercase text-subtle mb-1">Program / Cohort *</label>
-                  <input 
-                    type="text" 
-                    value={user.cohort} 
-                    onChange={(e) => setUser({...user, cohort: e.target.value})} 
-                    placeholder="e.g. WG'26"
-                    className="w-full bg-white border border-wharton-navy/20 p-2 font-serif text-wharton-navy" 
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] uppercase text-subtle mb-1">Phone Number *</label>
-                  <input 
-                    type="tel" 
-                    value={user.phone} 
-                    onChange={(e) => setUser({...user, phone: e.target.value})} 
-                    placeholder="(415) 000-0000"
-                    className="w-full bg-white border border-wharton-navy/20 p-2 font-serif text-wharton-navy" 
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-[10px] uppercase text-subtle mb-1 font-semibold">Email *</label>
-                <input 
-                  type="email" 
-                  value={user.email} 
-                  onChange={(e) => setUser({...user, email: e.target.value})} 
-                  placeholder="username@wharton.upenn.edu"
-                  className="w-full bg-white border border-wharton-navy/20 p-2 font-serif text-wharton-navy" 
-                />
-              </div>
-            </div>
-
-            <button 
-              onClick={handleSaveVerification}
-              className="w-full mt-6 bg-wharton-navy text-white py-3 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors font-semibold"
-            >
-              VERIFY
-            </button>
-
-            <div className="mt-4 pt-3 border-t border-wharton-navy/10 text-center">
-              <a 
-                href="mailto:pooja502@upenn.edu?subject=Glover%20Library%20PennID%20Support" 
-                className="text-[11px] text-wharton-red hover:underline flex items-center justify-center gap-1.5"
+              <button 
+                type="submit"
+                className="w-full bg-wharton-navy text-white py-3 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center justify-center gap-2 font-semibold"
               >
-                <AlertCircle className="w-3.5 h-3.5" />
-                Don't have access to PennID or ran into issues? Reach out to support
-              </a>
-            </div>
+                <Lock className="w-4 h-4" /> Unlock Admin Dashboard
+              </button>
+            </form>
           </div>
         </div>
       )}
 
-      {/* MODAL 7: Verification Reminder Interstitial */}
-      {activeModal === 'verify-reminder' && (
-        <div className="fixed inset-0 bg-wharton-navy/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-canvas border-2 border-wharton-red max-w-sm w-full p-6 shadow-2xl relative text-center">
-            <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 text-wharton-navy/50 hover:text-wharton-navy"><X className="w-5 h-5" /></button>
-            <ShieldAlert className="w-12 h-12 text-wharton-red mx-auto mb-3" />
-            <h3 className="font-serif text-2xl text-wharton-navy mb-2">PennID Verification Required</h3>
-            <p className="text-xs text-subtle mb-6 leading-relaxed">
-              Please complete a quick one-time PennID verification before borrowing books from Glover Library.
-            </p>
-            <button 
-              onClick={() => setActiveModal('verify')}
-              className="w-full bg-wharton-navy text-white py-3 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center justify-center gap-2 font-semibold"
-            >
-              <Camera className="w-4 h-4" /> Proceed to PennID Verification
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 8: Product Detail Page (PDP) */}
-      {activeModal === 'pdp' && selectedBook && (
-        <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-canvas border border-wharton-navy max-w-lg w-full p-8 shadow-2xl relative">
+      {/* MODAL 7: Admin Panel Modal */}
+      {activeModal === 'admin-panel' && (
+        <div className="fixed inset-0 bg-wharton-navy/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-canvas border border-wharton-navy max-w-4xl w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
             <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 text-wharton-navy/50 hover:text-wharton-navy"><X className="w-5 h-5" /></button>
             
-            <div className="flex justify-between items-start text-xs text-subtle mb-2">
-              <span className="text-wharton-red font-semibold">{selectedBook.shelf}</span>
-            </div>
-
-            <h2 className="font-serif text-3xl text-wharton-navy mb-1">{selectedBook.title}</h2>
-            <p className="text-base text-charcoal/80 mb-1">{selectedBook.author}</p>
-            {selectedBook.isbn && <p className="text-xs font-mono text-subtle mb-4">ISBN: {selectedBook.isbn}</p>}
-
-            <div className="flex flex-wrap gap-2 mb-6">
-              {selectedBook.tags.map((t, idx) => (
-                <span key={idx} className="bg-white px-2.5 py-1 text-xs text-wharton-navy border border-wharton-navy/20">
-                  {t}
-                </span>
-              ))}
-            </div>
-
-            {selectedBook.recommendedBy && (
-              <div className="bg-white p-4 border-l-2 border-wharton-red border-y border-r border-wharton-navy/10 mb-6 text-xs">
-                <span className="text-[10px] uppercase tracking-widest text-wharton-red font-semibold block mb-1">Recommended By</span>
-                <p className="font-serif text-sm text-wharton-navy">{selectedBook.recommendedBy}</p>
-              </div>
-            )}
-
-            <div className="pt-4 border-t border-wharton-navy/10 flex justify-between items-center text-xs">
+            <div className="flex justify-between items-start mb-6 border-b border-wharton-navy/10 pb-4">
               <div>
-                {selectedBook.isCheckedOut ? (
-                  <span className="text-wharton-red font-medium">● Borrowed</span>
-                ) : (
-                  <span className="text-emerald-700 font-medium">● Available</span>
-                )}
+                <div className="flex items-center gap-2 text-emerald-700 text-xs uppercase tracking-widest font-semibold mb-1">
+                  <ShieldCheck className="w-4 h-4" /> Integrated Admin Mode Active
+                </div>
+                <h3 className="font-serif text-3xl text-wharton-navy">Librarian Dashboard</h3>
               </div>
-              {selectedBook.isCheckedOut ? (
+              <button 
+                onClick={handleExportCSV}
+                className="bg-wharton-navy text-white px-3.5 py-2 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center gap-1.5"
+              >
+                <Download className="w-3.5 h-3.5" /> Export Catalog CSV
+              </button>
+            </div>
+
+            <div className="flex justify-between items-center mb-4 text-xs">
+              <span className="font-serif text-base text-wharton-navy font-semibold">
+                Inventory Status ({adminFilteredBooks.length} titles)
+              </span>
+              <div className="flex gap-2">
                 <button 
-                  onClick={() => handleSimulateReturnScan(selectedBook)}
-                  className="bg-emerald-700 text-white px-4 py-2 text-xs uppercase tracking-wider hover:bg-emerald-800 transition-colors flex items-center gap-2"
+                  onClick={() => setAdminStockFilter('all')}
+                  className={`px-3 py-1 border ${adminStockFilter === 'all' ? 'bg-wharton-navy text-white' : 'bg-white'}`}
                 >
-                  <RotateCcw className="w-4 h-4" /> Scan to Return
+                  All ({books.length})
                 </button>
+                <button 
+                  onClick={() => setAdminStockFilter('in-stock')}
+                  className={`px-3 py-1 border ${adminStockFilter === 'in-stock' ? 'bg-emerald-800 text-white' : 'bg-white'}`}
+                >
+                  Available ({books.filter(b => !b.isCheckedOut).length})
+                </button>
+                <button 
+                  onClick={() => setAdminStockFilter('checked-out')}
+                  className={`px-3 py-1 border ${adminStockFilter === 'checked-out' ? 'bg-wharton-red text-white' : 'bg-white'}`}
+                >
+                  Borrowed ({books.filter(b => b.isCheckedOut).length})
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white border border-wharton-navy/15 overflow-x-auto mb-6">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-wharton-navy text-canvas uppercase tracking-wider font-semibold border-b border-wharton-navy/20">
+                  <tr>
+                    <th className="p-3">Title & Author</th>
+                    <th className="p-3">Shelf</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3">Borrower Details</th>
+                    <th className="p-3 text-right">Override Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-wharton-navy/10">
+                  {adminFilteredBooks.map((b) => (
+                    <tr key={b.id} className="hover:bg-canvas/50">
+                      <td className="p-3 font-serif">
+                        <span className="font-semibold text-wharton-navy block">{b.title}</span>
+                        <span className="text-subtle text-[11px]">{b.author}</span>
+                      </td>
+                      <td className="p-3 text-wharton-red font-medium">{b.shelf}</td>
+                      <td className="p-3">
+                        {b.isCheckedOut ? (
+                          <span className="text-wharton-red font-semibold">● Borrowed</span>
+                        ) : (
+                          <span className="text-emerald-700 font-semibold">● Available</span>
+                        )}
+                      </td>
+                      <td className="p-3 font-medium text-charcoal/80">
+                        {b.checkedOutBy ? (
+                          <div>
+                            <span className="font-semibold text-wharton-navy block">{b.checkedOutBy}</span>
+                            <span className="text-subtle text-[10px] block">{b.borrowerEmail || 'No email recorded'}</span>
+                            <span className="text-subtle text-[10px] block font-mono">Due: {b.dueDate || 'N/A'}</span>
+                          </div>
+                        ) : '—'}
+                      </td>
+                      <td className="p-3 text-right">
+                        <button 
+                          onClick={() => handleToggleStockStatus(b.id)}
+                          className="border border-wharton-navy/20 px-2.5 py-1 text-[11px] uppercase tracking-wider hover:bg-wharton-navy hover:text-white transition-colors inline-flex items-center gap-1"
+                        >
+                          <RefreshCw className="w-3 h-3" /> Toggle Status
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="border-t border-wharton-navy/10 pt-4">
+              <h4 className="font-serif text-lg text-wharton-navy mb-2">Verified Patron Audit Log</h4>
+              {user.isVerified ? (
+                <div className="bg-white p-4 border border-wharton-navy/15 text-xs flex justify-between items-center">
+                  <div>
+                    <p className="font-serif text-sm font-semibold text-wharton-navy">{user.name}</p>
+                    <p className="text-subtle">PennKey: <span className="font-mono">{user.pennKey}</span> • {user.email}</p>
+                  </div>
+                  <span className="text-emerald-800 font-semibold bg-emerald-50 border border-emerald-700/20 px-2.5 py-1">
+                    ✓ Verified Penn Patron
+                  </span>
+                </div>
               ) : (
-                <button 
-                  onClick={() => handleSimulateScan(selectedBook)}
-                  className="bg-wharton-navy text-white px-4 py-2 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center gap-2"
-                >
-                  <Radio className="w-4 h-4" /> Scan Tag to Borrow
-                </button>
+                <p className="text-xs text-subtle italic">No patrons currently active in device session.</p>
               )}
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 9: Checkout Confirmation Modal */}
-      {activeModal === 'checkout' && selectedBook && (
-        <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-canvas border border-wharton-navy max-w-md w-full p-6 shadow-2xl relative">
-            <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 text-wharton-navy/50 hover:text-wharton-navy"><X className="w-5 h-5" /></button>
-            
-            <div className="flex items-center gap-2 text-emerald-700 text-xs uppercase tracking-widest font-semibold mb-1">
-              <CheckCircle2 className="w-4 h-4" /> Tag Recognized
-            </div>
-            <h3 className="font-serif text-2xl text-wharton-navy mt-1 mb-4">{selectedBook.title}</h3>
-
-            <div className="bg-white p-4 border border-wharton-navy/10 space-y-2.5 text-xs mb-6">
-              <div className="flex justify-between"><span className="text-subtle">Author:</span> <span className="font-medium">{selectedBook.author}</span></div>
-              <div className="flex justify-between"><span className="text-subtle">Shelf Location:</span> <span className="font-medium text-wharton-red">{selectedBook.shelf}</span></div>
-              <div className="flex justify-between"><span className="text-subtle">Patron:</span> <span className="font-medium">{user.name || 'Gerald Glover'} ({user.cohort})</span></div>
-              <div className="flex justify-between pt-2 border-t border-wharton-navy/10 font-semibold text-wharton-navy">
-                <span className="flex items-center gap-1 text-wharton-red"><Calendar className="w-3.5 h-3.5" /> Due Date (14 Days):</span> 
-                <span>{getCalculatedDueDate()}</span>
-              </div>
-            </div>
-
-            <button 
-              onClick={() => handleCheckout(selectedBook.id)}
-              className="w-full bg-wharton-navy text-white py-3 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center justify-center gap-2 font-semibold"
-            >
-              <CheckCircle2 className="w-4 h-4" /> BORROW
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL 10: Return Confirmation Modal */}
-      {activeModal === 'return-confirm' && selectedBook && (
-        <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-canvas border border-wharton-navy max-w-md w-full p-6 shadow-2xl relative">
-            <button onClick={() => setActiveModal(null)} className="absolute top-4 right-4 text-wharton-navy/50 hover:text-wharton-navy"><X className="w-5 h-5" /></button>
-            
-            <div className="flex items-center gap-2 text-emerald-700 text-xs uppercase tracking-widest font-semibold mb-1">
-              <CheckCircle2 className="w-4 h-4" /> Return Tag Recognized
-            </div>
-            <h3 className="font-serif text-2xl text-wharton-navy mt-1 mb-4">{selectedBook.title}</h3>
-
-            <div className="bg-white p-4 border border-wharton-navy/10 space-y-2 text-xs mb-6">
-              <div className="flex justify-between"><span className="text-subtle">Author:</span> <span className="font-medium">{selectedBook.author}</span></div>
-              <div className="flex justify-between"><span className="text-subtle">Shelf Location:</span> <span className="font-medium text-wharton-red">{selectedBook.shelf}</span></div>
-            </div>
-
-            <button 
-              onClick={() => handleConfirmReturn(selectedBook.id)}
-              className="w-full bg-emerald-700 text-white py-3 text-xs uppercase tracking-wider hover:bg-emerald-800 transition-colors flex items-center justify-center gap-2 font-semibold"
-            >
-              <CheckCircle2 className="w-4 h-4" /> RETURNED TO SHELF
-            </button>
           </div>
         </div>
       )}
