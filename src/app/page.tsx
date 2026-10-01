@@ -342,7 +342,7 @@ export default function Home() {
     } finally {
       setIsSubmittingRequest(false);
       setActiveModal(null);
-      alert(`Request received! The librarian team has been notified and will coordinate delivery directly to you. Check ${user.email} shortly for details.`);
+      alert(`Request received! The librarian team has been notified and will coordinate delivery. Check ${user.email} shortly for details.`);
     }
   };
 
