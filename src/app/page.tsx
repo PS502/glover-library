@@ -343,6 +343,7 @@ export default function Home() {
       setIsSubmittingRequest(false);
       setActiveModal(null);
       alert(`Request received! The librarian team has been notified and will coordinate delivery directly to you. Check ${user.email} shortly for details.`);
+    }
   };
 
   const handleDonateBookSubmit = (e: React.FormEvent) => {
@@ -461,7 +462,7 @@ export default function Home() {
           <HeartHandshake className="w-8 h-8 text-wharton-red shrink-0" />
           <div>
             <h4 className="font-serif text-xl text-white">Borrow freely. Return thoughtfully.</h4>
-            <p className="text-xs text-canvas/70 mt-1">Browse, request in one tap, and pick up on Floor 6 during your class weekends.</p>
+            <p className="text-xs text-canvas/70 mt-1">Browse and request in one tap—we will bring the book directly to you during class.</p>
           </div>
         </div>
       </section>
@@ -470,9 +471,9 @@ export default function Home() {
       <section className="px-6 py-10 md:px-16 max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-baseline mb-8 gap-4">
           <div>
-            <span className="text-xs uppercase tracking-widest text-wharton-navy/60">6th Floor Break Area</span>
+            <span className="text-xs uppercase tracking-widest text-wharton-navy/60">Collection Catalog</span>
             <h3 className="font-serif text-2xl text-wharton-navy mt-1 flex items-center gap-2">
-              Collection ({filteredBooks.length}) <Sparkles className="w-4 h-4 text-wharton-red" />
+              Titles ({filteredBooks.length}) <Sparkles className="w-4 h-4 text-wharton-red" />
             </h3>
           </div>
           
@@ -722,7 +723,6 @@ export default function Home() {
             <div className="bg-white p-4 border border-wharton-navy/10 space-y-2 text-xs mb-6">
               <div className="flex justify-between"><span className="text-subtle">Author:</span> <span className="font-medium">{selectedBook.author}</span></div>
               <div className="flex justify-between"><span className="text-subtle">Shelf Location:</span> <span className="font-medium text-wharton-red">{selectedBook.shelf}</span></div>
-              <div className="flex justify-between"><span className="text-subtle">Return Station:</span> <span className="font-medium">2 Harrison St, Fl 6</span></div>
             </div>
 
             <button 
@@ -747,7 +747,7 @@ export default function Home() {
             <p className="text-xs text-subtle mb-4">Enrich our collection by contributing a book.</p>
 
             <div className="bg-white p-3.5 border-l-2 border-wharton-red border-y border-r border-wharton-navy/15 mb-5 text-xs">
-              <span className="text-[10px] uppercase tracking-widest text-wharton-red font-bold block mb-1">Ship or Drop Off Books To:</span>
+              <span className="text-[10px] uppercase tracking-widest text-wharton-red font-bold block mb-1">Drop Off Location:</span>
               <p className="font-serif text-sm font-semibold text-wharton-navy">Glover Library / Pooja</p>
               <p className="text-charcoal/90 mt-0.5">2 Harrison St, Fl 6</p>
               <p className="text-charcoal/90">San Francisco, CA 94105</p>
@@ -983,7 +983,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="border-t border-wharton-navy/10 py-8 px-6 md:px-16 text-center text-xs text-subtle">
-        <p>Glover Library • WEMBA Executive MBA Program • 2 Harrison St, San Francisco</p>
+        <p>Glover Library • WEMBA Executive MBA Program • San Francisco</p>
         <p className="mt-1 font-medium text-wharton-navy">App developed by Pooja S • Curated by Gerald Glover (WG’26)</p>
       </footer>
     </div>
