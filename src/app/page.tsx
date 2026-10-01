@@ -342,8 +342,7 @@ export default function Home() {
     } finally {
       setIsSubmittingRequest(false);
       setActiveModal(null);
-      alert(`Borrow request confirmed! A receipt was sent to ${user.email}, and the librarian team has been notified.`);
-    }
+      alert(`Request received! The librarian team has been notified and will coordinate delivery directly to you. Check ${user.email} shortly for details.`);
   };
 
   const handleDonateBookSubmit = (e: React.FormEvent) => {
