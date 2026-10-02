@@ -1,7 +1,25 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, Sparkles, MapPin, HeartHandshake, CheckCircle2, X, AlertCircle, RotateCcw, Gift, ShieldCheck, Lock, Download, RefreshCw, Calendar, BookOpen, UserCheck, Send } from 'lucide-react';
+import { 
+  Search, 
+  Sparkles, 
+  HeartHandshake, 
+  CheckCircle2, 
+  X, 
+  AlertCircle, 
+  RotateCcw, 
+  Gift, 
+  ShieldCheck, 
+  Lock, 
+  Download, 
+  RefreshCw, 
+  Calendar, 
+  BookOpen, 
+  UserCheck, 
+  Send,
+  Mail
+} from 'lucide-react';
 
 interface Book {
   id: string;
@@ -59,7 +77,8 @@ export default function Home() {
     author: '',
     tag: 'Strategic Management',
     donorName: '',
-    donorCohort: "WG'26"
+    donorCohort: "WG'26",
+    donorEmail: ''
   });
 
   const whartonTags = [
@@ -101,7 +120,7 @@ export default function Home() {
     return emailAddress.split('@')[0].trim().toLowerCase();
   };
 
-  // Complete Catalog of 91 Books
+  // Complete Catalog
   const [books, setBooks] = useState<Book[]>([
     { id: '1', title: "A Culture of Growth", author: "Joel Mokyr", isbn: "978-0691168883", tags: ["Strategic Management", "Macroeconomics"], shelf: "Dewey 330 - Economics", isCheckedOut: false },
     { id: '2', title: "A Giant Leap", author: "Robert Wachter", isbn: "978-0071840118", tags: ["Operations", "Scaling"], shelf: "Dewey 658 - Operations", isCheckedOut: false },
@@ -236,7 +255,21 @@ export default function Home() {
     a.click();
   };
 
-  // Verification Handler
+  // STEP 1: Intercept Request Click
+  const handleInitiateRequest = (book: Book) => {
+    setSelectedBook(book);
+
+    const savedUser = localStorage.getItem('glover_library_user');
+    const isAlreadyVerified = user.isVerified || (savedUser && JSON.parse(savedUser).isVerified);
+
+    if (isAlreadyVerified) {
+      setActiveModal('request-confirm');
+    } else {
+      setActiveModal('verify');
+    }
+  };
+
+  // STEP 2: Strict Verification Submission
   const handleVerifySubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setVerificationError('');
@@ -269,6 +302,7 @@ export default function Home() {
     setUser(verifiedProfile);
     localStorage.setItem('glover_library_user', JSON.stringify(verifiedProfile));
 
+    // Automatically proceed to book request if one was pending
     if (selectedBook) {
       setActiveModal('request-confirm');
     } else {
@@ -276,33 +310,13 @@ export default function Home() {
     }
   };
 
-  // Trigger from "Request" button on card or PDP
-  const handleInitiateRequest = (book: Book) => {
-    setSelectedBook(book);
-
-    const savedUser = localStorage.getItem('glover_library_user');
-    const isAlreadyVerified = user.isVerified || (savedUser && JSON.parse(savedUser).isVerified);
-
-    if (isAlreadyVerified) {
-      setActiveModal('request-confirm');
-    } else {
-      setActiveModal('verify');
-    }
-  };
-
-  const handleConfirmReturn = (bookId: string) => {
-    setBooks(prev => prev.map(b => b.id === bookId ? { 
-      ...b, 
-      isCheckedOut: false, 
-      checkedOutBy: undefined, 
-      borrowerEmail: undefined, 
-      dueDate: undefined 
-    } : b));
-    setActiveModal(null);
-  };
-
-  // Final Borrow Request Submission
+  // STEP 3: Final Borrow Request Submission (Protected)
   const handleConfirmBorrowRequest = async () => {
+    if (!user.isVerified) {
+      setActiveModal('verify');
+      return;
+    }
+
     if (!selectedBook) return;
     setIsSubmittingRequest(true);
 
@@ -313,7 +327,6 @@ export default function Home() {
       timeStyle: 'medium',
     });
 
-    // 1. Update UI state locally
     setBooks(prev => prev.map(b => b.id === selectedBook.id ? {
       ...b,
       isCheckedOut: true,
@@ -322,7 +335,6 @@ export default function Home() {
       dueDate: calculatedDue
     } : b));
 
-    // 2. Fire Nodemailer endpoint
     try {
       await fetch('/api/send-checkout', {
         method: 'POST',
@@ -342,14 +354,26 @@ export default function Home() {
     } finally {
       setIsSubmittingRequest(false);
       setActiveModal(null);
-      alert(`Request received! The librarian team has been notified and will coordinate delivery. Check ${user.email} shortly for details.`);
+      alert(`Request confirmed! The Glover Library team has been notified. We will deliver "${selectedBook.title}" directly to you during class.`);
     }
   };
 
+  const handleConfirmReturn = (bookId: string) => {
+    setBooks(prev => prev.map(b => b.id === bookId ? { 
+      ...b, 
+      isCheckedOut: false, 
+      checkedOutBy: undefined, 
+      borrowerEmail: undefined, 
+      dueDate: undefined 
+    } : b));
+    setActiveModal(null);
+  };
+
+  // Step 4: Donate Book - Patrons reach out to coordinate pickup
   const handleDonateBookSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!donationForm.title || !donationForm.author || !donationForm.donorName) {
-      alert("Please fill in the book title, author, and donor name.");
+      alert("Please fill in the book title, author, and your name.");
       return;
     }
 
@@ -364,15 +388,15 @@ export default function Home() {
     };
 
     setBooks(prev => [newBook, ...prev]);
-    setDonationForm({ title: '', author: '', tag: 'Strategic Management', donorName: '', donorCohort: "WG'26" });
+    setDonationForm({ title: '', author: '', tag: 'Strategic Management', donorName: '', donorCohort: "WG'26", donorEmail: '' });
     setActiveModal(null);
-    alert(`Thank you! "${newBook.title}" has been registered. Please drop off your book at 2 Harrison St, Fl 6!`);
+    alert(`Thank you! "${newBook.title}" has been added to our catalog queue. Please reach out to Gerald or Pooja to coordinate pickup during your next class weekend.`);
   };
 
   const filteredBooks = books.filter(book => {
     const matchesSearch = book.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          book.author.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          book.shelf.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          book.author.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                          book.shelf.toLowerCase().includes(searchQuery.toLowerCase()) || 
                           (book.isbn && book.isbn.includes(searchQuery));
     
     const matchesTags = selectedTags.length === 0 || selectedTags.some(tag => book.tags.includes(tag));
@@ -393,9 +417,7 @@ export default function Home() {
           <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-wharton-red font-semibold mb-1">
             <span>Wharton Executive MBA</span>
             <span>•</span>
-            <span className="flex items-center gap-1 text-wharton-navy/70">
-              <MapPin className="w-3 h-3 text-wharton-red" /> 2 Harrison St, Fl 6 (612-615 Break Area)
-            </span>
+            <span className="text-wharton-navy/70">San Francisco Cohort</span>
           </div>
           <h1 className="font-serif text-4xl md:text-5xl text-wharton-navy tracking-tight">Glover Library</h1>
         </div>
@@ -462,7 +484,7 @@ export default function Home() {
           <HeartHandshake className="w-8 h-8 text-wharton-red shrink-0" />
           <div>
             <h4 className="font-serif text-xl text-white">Borrow freely. Return thoughtfully.</h4>
-            <p className="text-xs text-canvas/70 mt-1">Browse and request in one tap—we will bring the book directly to you during class.</p>
+            <p className="text-xs text-canvas/70 mt-1">Request in one tap—we will hand the volume directly to you during class weekend.</p>
           </div>
         </div>
       </section>
@@ -571,8 +593,10 @@ export default function Home() {
             <div className="flex items-center gap-2 text-wharton-red text-xs uppercase tracking-widest font-semibold mb-1">
               <UserCheck className="w-4 h-4" /> Patron Identity Verification
             </div>
-            <h3 className="font-serif text-2xl text-wharton-navy mb-1">Verify PennID</h3>
-            <p className="text-xs text-subtle mb-4">Please enter your full name and official Penn email to request books from Glover Library.</p>
+            <h3 className="font-serif text-2xl text-wharton-navy mb-1">Verify Penn Credentials</h3>
+            <p className="text-xs text-subtle mb-4">
+              To request books from Glover Library, please verify your identity with your official Penn email.
+            </p>
 
             <form onSubmit={handleVerifySubmit} className="space-y-4">
               <div>
@@ -611,7 +635,7 @@ export default function Home() {
                 type="submit"
                 className="w-full mt-2 bg-wharton-navy text-white py-3 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors font-semibold flex items-center justify-center gap-2"
               >
-                <CheckCircle2 className="w-4 h-4" /> VERIFY
+                <CheckCircle2 className="w-4 h-4" /> VERIFY & CONTINUE
               </button>
             </form>
           </div>
@@ -631,7 +655,7 @@ export default function Home() {
 
             <div className="bg-white p-4 border border-wharton-navy/10 space-y-2.5 text-xs mb-6">
               <div className="flex justify-between"><span className="text-subtle">Author:</span> <span className="font-medium">{selectedBook.author}</span></div>
-              <div className="flex justify-between"><span className="text-subtle">Shelf Location:</span> <span className="font-medium text-wharton-red">{selectedBook.shelf}</span></div>
+              <div className="flex justify-between"><span className="text-subtle">Category:</span> <span className="font-medium text-wharton-red">{selectedBook.tags.join(', ')}</span></div>
               <div className="flex justify-between"><span className="text-subtle">Patron Name:</span> <span className="font-medium">{user.name}</span></div>
               <div className="flex justify-between"><span className="text-subtle">PennKey:</span> <span className="font-medium font-mono text-wharton-navy">{user.pennKey || extractPennKey(user.email)}</span></div>
               <div className="flex justify-between"><span className="text-subtle">Penn Email:</span> <span className="font-medium">{user.email}</span></div>
@@ -646,7 +670,7 @@ export default function Home() {
               disabled={isSubmittingRequest}
               className="w-full bg-wharton-navy text-white py-3 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center justify-center gap-2 font-semibold disabled:opacity-50"
             >
-              <Send className="w-4 h-4" /> {isSubmittingRequest ? 'Submitting Request...' : 'REQUEST TO BORROW'}
+              <Send className="w-4 h-4" /> {isSubmittingRequest ? 'Submitting Request...' : 'CONFIRM REQUEST'}
             </button>
           </div>
         </div>
@@ -694,7 +718,7 @@ export default function Home() {
                   onClick={() => setActiveModal('return-confirm')}
                   className="bg-emerald-700 text-white px-4 py-2 text-xs uppercase tracking-wider hover:bg-emerald-800 transition-colors flex items-center gap-2"
                 >
-                  <RotateCcw className="w-4 h-4" /> Return to Shelf
+                  <RotateCcw className="w-4 h-4" /> Return Book
                 </button>
               ) : (
                 <button 
@@ -722,20 +746,20 @@ export default function Home() {
 
             <div className="bg-white p-4 border border-wharton-navy/10 space-y-2 text-xs mb-6">
               <div className="flex justify-between"><span className="text-subtle">Author:</span> <span className="font-medium">{selectedBook.author}</span></div>
-              <div className="flex justify-between"><span className="text-subtle">Shelf Location:</span> <span className="font-medium text-wharton-red">{selectedBook.shelf}</span></div>
+              <div className="flex justify-between"><span className="text-subtle">Shelf Category:</span> <span className="font-medium text-wharton-red">{selectedBook.shelf}</span></div>
             </div>
 
             <button 
               onClick={() => handleConfirmReturn(selectedBook.id)}
               className="w-full bg-emerald-700 text-white py-3 text-xs uppercase tracking-wider hover:bg-emerald-800 transition-colors flex items-center justify-center gap-2 font-semibold"
             >
-              <CheckCircle2 className="w-4 h-4" /> CONFIRM RETURN TO SHELF
+              <CheckCircle2 className="w-4 h-4" /> CONFIRM RETURN
             </button>
           </div>
         </div>
       )}
 
-      {/* MODAL 5: Donate Book Modal */}
+      {/* MODAL 5: Donate Book Modal (Reach out to coordinate pickup) */}
       {activeModal === 'donate' && (
         <div className="fixed inset-0 bg-wharton-navy/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-canvas border border-wharton-navy max-w-md w-full p-6 shadow-2xl relative max-h-[90vh] overflow-y-auto">
@@ -744,13 +768,18 @@ export default function Home() {
               <Gift className="w-4 h-4" /> Cohort Contribution
             </div>
             <h3 className="font-serif text-2xl text-wharton-navy mb-1">Donate a Book</h3>
-            <p className="text-xs text-subtle mb-4">Enrich our collection by contributing a book.</p>
+            <p className="text-xs text-subtle mb-4">Register your book below, then connect with our team to coordinate pickup during class weekend.</p>
 
-            <div className="bg-white p-3.5 border-l-2 border-wharton-red border-y border-r border-wharton-navy/15 mb-5 text-xs">
-              <span className="text-[10px] uppercase tracking-widest text-wharton-red font-bold block mb-1">Drop Off Location:</span>
-              <p className="font-serif text-sm font-semibold text-wharton-navy">Glover Library / Pooja</p>
-              <p className="text-charcoal/90 mt-0.5">2 Harrison St, Fl 6</p>
-              <p className="text-charcoal/90">San Francisco, CA 94105</p>
+            <div className="bg-white p-4 border-l-2 border-wharton-red border-y border-r border-wharton-navy/15 mb-5 text-xs">
+              <span className="text-[10px] uppercase tracking-widest text-wharton-red font-bold block mb-1">Coordinate Pickup:</span>
+              <p className="font-serif text-sm font-semibold text-wharton-navy">Glover Library Team</p>
+              <p className="text-charcoal/90 mt-1">We pick up book donations in person during class weekends. After registering, message Gerald or Pooja directly:</p>
+              <a 
+                href="mailto:pooja502@upenn.edu?subject=Glover%20Library%20Book%20Donation%20Pickup"
+                className="mt-2 inline-flex items-center gap-1.5 font-semibold text-wharton-red hover:underline"
+              >
+                <Mail className="w-3.5 h-3.5" /> Email us to schedule pickup
+              </a>
             </div>
 
             <form onSubmit={handleDonateBookSubmit} className="space-y-3 text-sm">
@@ -793,7 +822,7 @@ export default function Home() {
 
               <div className="grid grid-cols-2 gap-3 pt-2 border-t border-wharton-navy/10">
                 <div>
-                  <label className="block text-[10px] uppercase text-subtle mb-1 font-semibold">Your Name (Donor Credit) *</label>
+                  <label className="block text-[10px] uppercase text-subtle mb-1 font-semibold">Your Name *</label>
                   <input 
                     type="text" 
                     value={donationForm.donorName || user.name} 
@@ -804,7 +833,7 @@ export default function Home() {
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] uppercase text-subtle mb-1 font-semibold">Cohort / Program *</label>
+                  <label className="block text-[10px] uppercase text-subtle mb-1 font-semibold">Cohort *</label>
                   <input 
                     type="text" 
                     value={donationForm.donorCohort} 
@@ -819,7 +848,7 @@ export default function Home() {
                 type="submit"
                 className="w-full mt-6 bg-wharton-navy text-white py-3 text-xs uppercase tracking-wider hover:bg-wharton-red transition-colors flex items-center justify-center gap-2 font-semibold"
               >
-                <Gift className="w-4 h-4" /> CONTRIBUTE
+                <Gift className="w-4 h-4" /> REGISTER & COORDINATE PICKUP
               </button>
             </form>
           </div>
