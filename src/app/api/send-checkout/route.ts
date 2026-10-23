@@ -15,20 +15,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Forward the checkout payload directly to Google Apps Script
-    const gasResponse = await fetch(webhookUrl, {
+    // Google Apps Script processes plain text JSON without CORS preflight/redirect issues
+    const gasResponse = await fetch(webhookUrl.trim(), {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'text/plain;charset=utf-8',
       },
       body: JSON.stringify(body),
       redirect: 'follow',
     });
 
+    if (!gasResponse.ok) {
+      const errorText = await gasResponse.text();
+      throw new Error(`Google Apps Script returned HTTP ${gasResponse.status}: ${errorText}`);
+    }
+
     const result = await gasResponse.json();
 
     if (result.status === "error") {
-      throw new Error(result.message || "Google Sheets webhook error");
+      throw new Error(result.message || "Google Sheets script execution error");
     }
 
     return NextResponse.json({ success: true, data: result });
